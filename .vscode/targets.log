@@ -1,0 +1,608 @@
+make all --print-data-base --no-builtin-variables --no-builtin-rules --question
+# GNU Make 3.81
+# Copyright (C) 2006  Free Software Foundation, Inc.
+# This is free software; see the source for copying conditions.
+# There is NO warranty; not even for MERCHANTABILITY or FITNESS FOR A
+# PARTICULAR PURPOSE.
+
+# This program built for i386-apple-darwin11.3.0
+
+# Make data base, printed on Thu Jul 14 15:04:19 2022
+
+# Variables
+
+# automatic
+<D = $(patsubst %/,%,$(dir $<))
+# automatic
+?F = $(notdir $?)
+# environment
+VSCODE_LOG_NATIVE = false
+# automatic
+?D = $(patsubst %/,%,$(dir $?))
+# automatic
+@D = $(patsubst %/,%,$(dir $@))
+# automatic
+@F = $(notdir $@)
+# makefile
+CURDIR := /Users/paolo/Documents/git/des
+# makefile
+SHELL = /bin/sh
+# environment
+VSCODE_NLS_CONFIG = {"locale":"en-gb","availableLanguages":{},"_languagePackSupport":true}
+# environment
+_ = /usr/bin/make
+# makefile (from `Makefile', line 1)
+MAKEFILE_LIST :=  Makefile
+# makefile (from `Makefile', line 18)
+DEBUG = 1
+# makefile (from `Makefile', line 1)
+SOURCES = $(wildcard src/*.cpp)
+# makefile (from `Makefile', line 20)
+CXXFLAGS = $(CSTD) -DDEBUG -g -ggdb $(DYFLAGS)
+# makefile (from `Makefile', line 10)
+DYFLAGS = 
+# environment
+VSCODE_VERBOSE_LOGGING = true
+# makefile (from `Makefile', line 8)
+SOEXT = dylib
+# environment
+__CFBundleIdentifier = com.microsoft.VSCode
+# makefile (from `Makefile', line 9)
+CSTD = -std=c++2a
+# environment
+VSCODE_IPC_HOOK_EXTHOST = /var/folders/v5/pwj_ysgn6579g89sssnk1lsh0000gn/T/vscode-ipc-5d5d8e98-d510-4c2f-a554-19ba796d8db7.sock
+# environment
+VSCODE_CWD = /
+# environment
+PATH = /usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin
+# makefile (from `Makefile', line 26)
+WARNING := -Wall -Wextra
+# environment
+VSCODE_LOG_STACK = false
+# environment
+ELECTRON_RUN_AS_NODE = 1
+# default
+.FEATURES := target-specific order-only second-expansion else-if archives jobserver check-symlink
+# environment
+SSH_AUTH_SOCK = /private/tmp/com.apple.launchd.XMpB1oHD8R/Listeners
+# automatic
+%F = $(notdir $%)
+# environment
+VSCODE_PIPE_LOGGING = true
+# environment
+PWD = /Users/paolo/Documents/git/des
+# environment
+ORIGINAL_XDG_CURRENT_DESKTOP = undefined
+# environment
+VSCODE_AMD_ENTRYPOINT = vs/workbench/api/node/extensionHostProcess
+# environment
+HOME = /Users/paolo
+# default
+MAKEFILEPATH = $(shell /usr/bin/xcode-select -print-path 2>/dev/null || echo /Developer)/Makefiles
+# environment
+VSCODE_CODE_CACHE_PATH = /Users/paolo/Library/Application Support/Code/CachedData/30d9c6cd9483b2cc586687151bcbcd635f373630
+# environment
+LOGNAME = paolo
+# environment
+APPLICATION_INSIGHTS_NO_DIAGNOSTIC_CHANNEL = 1
+# makefile (from `Makefile', line 3)
+DEPENDS = $(patsubst %.cpp,%.d,$(SOURCES))
+# environment
+VSCODE_HANDLES_UNCAUGHT_ERRORS = true
+# automatic
+^D = $(patsubst %/,%,$(dir $^))
+# environment
+XPC_FLAGS = 0x0
+# default
+MAKE = $(MAKE_COMMAND)
+# default
+MAKECMDGOALS := all
+# environment
+SHLVL = 1
+# default
+MAKE_VERSION := 3.81
+# environment
+USER = paolo
+# makefile
+.DEFAULT_GOAL := all
+# automatic
+%D = $(patsubst %/,%,$(dir $%))
+# default
+MAKE_COMMAND := /Library/Developer/CommandLineTools/usr/bin/make
+# default
+.VARIABLES := 
+# environment
+TMPDIR = /var/folders/v5/pwj_ysgn6579g89sssnk1lsh0000gn/T/
+# automatic
+*F = $(notdir $*)
+# makefile (from `Makefile', line 4)
+OS = $(shell uname)
+# environment
+VSCODE_IPC_HOOK = /Users/paolo/Library/Application Support/Code/1.68.1-main.sock
+# makefile
+MAKEFLAGS = Rrqp
+# environment
+MFLAGS = -Rrqp
+# automatic
+*D = $(patsubst %/,%,$(dir $*))
+# environment
+XPC_SERVICE_NAME = application.com.microsoft.VSCode.3673654.3673661
+# automatic
++D = $(patsubst %/,%,$(dir $+))
+# automatic
++F = $(notdir $+)
+# environment
+__CF_USER_TEXT_ENCODING = 0x1F5:0x0:0x0
+# environment
+COMMAND_MODE = unix2003
+# default
+MAKEFILES := 
+# automatic
+<F = $(notdir $<)
+# environment
+LC_ALL = C
+# automatic
+^F = $(notdir $^)
+# default
+SUFFIXES := 
+# default
+.INCLUDE_DIRS = /usr/local/include
+# environment
+MAKELEVEL := 0
+# makefile (from `Makefile', line 2)
+OBJECTS = $(patsubst %.cpp,%.o,$(SOURCES))
+# environment
+LANG = C
+# environment
+VSCODE_PID = 1099
+# variable set hash-table stats:
+# Load=72/1024=7%, Rehash=0, Collisions=2/111=2%
+
+# Pattern-specific Variable Values
+
+# No pattern-specific variable values.
+
+# Directories
+
+# . (device 16777234, inode 1523827): 13 files, no impossibilities.
+# src (device 16777234, inode 1786588): 45 files, no impossibilities.
+
+# 58 files, no impossibilities in 2 directories.
+
+# Implicit Rules
+
+%.o: %.cpp Makefile
+#  commands to execute (from `Makefile', line 49):
+	$(CXX) $(WARNING) $(CXXFLAGS) -MMD -MP -c $< -o $@
+	
+
+# 1 implicit rules, 0 (0.0%) terminal.
+
+# Files
+
+# Not a target:
+src/libdes_queue.cpp:
+#  Implicit rule search has been done.
+#  Last modified 2022-07-12 19:04:18
+#  File has been updated.
+#  Successfully updated.
+# variable set hash-table stats:
+# Load=0/32=0%, Rehash=0, Collisions=0/0=0%
+
+clean-lib:
+#  Implicit rule search has not been done.
+#  Modification time never checked.
+#  File has not been updated.
+#  commands to execute (from `Makefile', line 39):
+	$(RM) libdes.$(SOEXT)
+	
+
+# Not a target:
+src/libdes_mm1.cpp:
+#  Implicit rule search has been done.
+#  Last modified 2022-06-22 12:22:44
+#  File has been updated.
+#  Successfully updated.
+# variable set hash-table stats:
+# Load=0/32=0%, Rehash=0, Collisions=0/0=0%
+
+all: libdes clean-dep
+#  Phony target (prerequisite of .PHONY).
+#  Command-line target.
+#  Implicit rule search has not been done.
+#  File does not exist.
+#  File has been updated.
+#  Needs to be updated (-q is set).
+# variable set hash-table stats:
+# Load=0/32=0%, Rehash=0, Collisions=0/5=0%
+
+# Not a target:
+src/libdes_sink.cpp:
+#  Implicit rule search has been done.
+#  Last modified 2022-06-30 18:16:06
+#  File has been updated.
+#  Successfully updated.
+# variable set hash-table stats:
+# Load=0/32=0%, Rehash=0, Collisions=0/0=0%
+
+.PHONY: all clean install
+#  Implicit rule search has not been done.
+#  Modification time never checked.
+#  File has not been updated.
+
+# Not a target:
+src/libdes_station.cpp:
+#  Implicit rule search has been done.
+#  Last modified 2022-07-01 15:12:03
+#  File has been updated.
+#  Successfully updated.
+# variable set hash-table stats:
+# Load=0/32=0%, Rehash=0, Collisions=0/0=0%
+
+src/libdes_node.o: src/libdes_node.cpp Makefile
+#  Implicit rule search has been done.
+#  Implicit/static pattern stem: `src/libdes_node'
+#  Last modified 2022-07-14 12:22:39
+#  File has been updated.
+#  Successfully updated.
+# variable set hash-table stats:
+# Load=0/32=0%, Rehash=0, Collisions=0/0=0%
+#  commands to execute (from `Makefile', line 49):
+	$(CXX) $(WARNING) $(CXXFLAGS) -MMD -MP -c $< -o $@
+	
+
+# Not a target:
+src/libdes_is.cpp:
+#  Implicit rule search has been done.
+#  Last modified 2022-06-22 12:22:44
+#  File has been updated.
+#  Successfully updated.
+# variable set hash-table stats:
+# Load=0/32=0%, Rehash=0, Collisions=0/0=0%
+
+# Not a target:
+src/libdes_queue.d:
+#  A default, MAKEFILES, or -include/sinclude makefile.
+#  Implicit rule search has been done.
+#  File does not exist.
+#  File has been updated.
+#  Failed to be updated.
+# variable set hash-table stats:
+# Load=0/32=0%, Rehash=0, Collisions=0/0=0%
+
+# Not a target:
+src/libdes_mm1.d:
+#  A default, MAKEFILES, or -include/sinclude makefile.
+#  Implicit rule search has been done.
+#  File does not exist.
+#  File has been updated.
+#  Failed to be updated.
+# variable set hash-table stats:
+# Load=0/32=0%, Rehash=0, Collisions=0/0=0%
+
+src/libdes_network.o: src/libdes_network.cpp Makefile
+#  Implicit rule search has been done.
+#  Implicit/static pattern stem: `src/libdes_network'
+#  Last modified 2022-07-14 12:22:38
+#  File has been updated.
+#  Successfully updated.
+# variable set hash-table stats:
+# Load=0/32=0%, Rehash=0, Collisions=0/0=0%
+#  commands to execute (from `Makefile', line 49):
+	$(CXX) $(WARNING) $(CXXFLAGS) -MMD -MP -c $< -o $@
+	
+
+# Not a target:
+src/libdes_sink.d:
+#  A default, MAKEFILES, or -include/sinclude makefile.
+#  Implicit rule search has been done.
+#  File does not exist.
+#  File has been updated.
+#  Failed to be updated.
+# variable set hash-table stats:
+# Load=0/32=0%, Rehash=0, Collisions=0/0=0%
+
+# Not a target:
+.SUFFIXES:
+#  Implicit rule search has not been done.
+#  Modification time never checked.
+#  File has not been updated.
+
+ 
+# Not a target:
+Makefile:
+#  Implicit rule search has been done.
+#  Last modified 2022-06-24 09:29:29
+#  File has been updated.
+#  Successfully updated.
+# variable set hash-table stats:
+# Load=0/32=0%, Rehash=0, Collisions=0/0=0%
+
+# Not a target:
+src/libdes_station.d:
+#  A default, MAKEFILES, or -include/sinclude makefile.
+#  Implicit rule search has been done.
+#  File does not exist.
+#  File has been updated.
+#  Failed to be updated.
+# variable set hash-table stats:
+# Load=0/32=0%, Rehash=0, Collisions=0/0=0%
+
+# Not a target:
+src/libdes_is.d:
+#  A default, MAKEFILES, or -include/sinclude makefile.
+#  Implicit rule search has been done.
+#  File does not exist.
+#  File has been updated.
+#  Failed to be updated.
+# variable set hash-table stats:
+# Load=0/32=0%, Rehash=0, Collisions=0/0=0%
+
+# Not a target:
+src/libdes_fifo.cpp:
+#  Implicit rule search has been done.
+#  Last modified 2022-04-13 11:36:17
+#  File has been updated.
+#  Successfully updated.
+# variable set hash-table stats:
+# Load=0/32=0%, Rehash=0, Collisions=0/0=0%
+
+src/libdes_queue.o: src/libdes_queue.cpp Makefile
+#  Implicit rule search has been done.
+#  Implicit/static pattern stem: `src/libdes_queue'
+#  Last modified 2022-07-14 12:22:40
+#  File has been updated.
+#  Successfully updated.
+# variable set hash-table stats:
+# Load=0/32=0%, Rehash=0, Collisions=0/0=0%
+#  commands to execute (from `Makefile', line 49):
+	$(CXX) $(WARNING) $(CXXFLAGS) -MMD -MP -c $< -o $@
+	
+
+# Not a target:
+src/libdes_fifo.d:
+#  A default, MAKEFILES, or -include/sinclude makefile.
+#  Implicit rule search has been done.
+#  File does not exist.
+#  File has been updated.
+#  Failed to be updated.
+# variable set hash-table stats:
+# Load=0/32=0%, Rehash=0, Collisions=0/0=0%
+
+src/libdes_mm1.o: src/libdes_mm1.cpp Makefile
+#  Implicit rule search has been done.
+#  Implicit/static pattern stem: `src/libdes_mm1'
+#  Last modified 2022-07-14 12:22:37
+#  File has been updated.
+#  Successfully updated.
+# variable set hash-table stats:
+# Load=0/32=0%, Rehash=0, Collisions=0/0=0%
+#  commands to execute (from `Makefile', line 49):
+	$(CXX) $(WARNING) $(CXXFLAGS) -MMD -MP -c $< -o $@
+	
+
+# Not a target:
+src/libdes_source.cpp:
+#  Implicit rule search has been done.
+#  Last modified 2022-06-23 23:50:34
+#  File has been updated.
+#  Successfully updated.
+# variable set hash-table stats:
+# Load=0/32=0%, Rehash=0, Collisions=0/0=0%
+
+src/libdes_sink.o: src/libdes_sink.cpp Makefile
+#  Implicit rule search has been done.
+#  Implicit/static pattern stem: `src/libdes_sink'
+#  Last modified 2022-07-14 12:22:40
+#  File has been updated.
+#  Successfully updated.
+# variable set hash-table stats:
+# Load=0/32=0%, Rehash=0, Collisions=0/0=0%
+#  commands to execute (from `Makefile', line 49):
+	$(CXX) $(WARNING) $(CXXFLAGS) -MMD -MP -c $< -o $@
+	
+
+# Not a target:
+src/libdes_event.cpp:
+#  Implicit rule search has been done.
+#  Last modified 2022-04-13 11:36:33
+#  File has been updated.
+#  Successfully updated.
+# variable set hash-table stats:
+# Load=0/32=0%, Rehash=0, Collisions=0/0=0%
+
+src/libdes_station.o: src/libdes_station.cpp Makefile
+#  Implicit rule search has been done.
+#  Implicit/static pattern stem: `src/libdes_station'
+#  Last modified 2022-07-14 12:22:48
+#  File has been updated.
+#  Successfully updated.
+# variable set hash-table stats:
+# Load=0/32=0%, Rehash=0, Collisions=0/0=0%
+#  commands to execute (from `Makefile', line 49):
+	$(CXX) $(WARNING) $(CXXFLAGS) -MMD -MP -c $< -o $@
+	
+
+# Not a target:
+.DEFAULT:
+#  Implicit rule search has not been done.
+#  Modification time never checked.
+#  File has not been updated.
+
+clean-dep:
+#  Implicit rule search has not been done.
+#  Modification time never checked.
+#  File has not been updated.
+#  commands to execute (from `Makefile', line 37):
+	$(RM)  $(DEPENDS)
+	
+
+src/libdes_is.o: src/libdes_is.cpp Makefile
+#  Implicit rule search has been done.
+#  Implicit/static pattern stem: `src/libdes_is'
+#  Last modified 2022-07-14 12:22:36
+#  File has been updated.
+#  Successfully updated.
+# variable set hash-table stats:
+# Load=0/32=0%, Rehash=0, Collisions=0/0=0%
+#  commands to execute (from `Makefile', line 49):
+	$(CXX) $(WARNING) $(CXXFLAGS) -MMD -MP -c $< -o $@
+	
+
+# Not a target:
+src/libdes_source.d:
+#  A default, MAKEFILES, or -include/sinclude makefile.
+#  Implicit rule search has been done.
+#  File does not exist.
+#  File has been updated.
+#  Failed to be updated.
+# variable set hash-table stats:
+# Load=0/32=0%, Rehash=0, Collisions=0/0=0%
+
+clean:
+#  Phony target (prerequisite of .PHONY).
+#  Implicit rule search has not been done.
+#  File does not exist.
+#  File has not been updated.
+#  commands to execute (from `Makefile', line 35):
+	$(RM) $(OBJECTS) $(DEPENDS)
+	
+
+# Not a target:
+src/libdes_event.d:
+#  A default, MAKEFILES, or -include/sinclude makefile.
+#  Implicit rule search has been done.
+#  File does not exist.
+#  File has been updated.
+#  Failed to be updated.
+# variable set hash-table stats:
+# Load=0/32=0%, Rehash=0, Collisions=0/0=0%
+
+# Not a target:
+src/libdes_node.cpp:
+#  Implicit rule search has been done.
+#  Last modified 2022-07-14 10:05:41
+#  File has been updated.
+#  Successfully updated.
+# variable set hash-table stats:
+# Load=0/32=0%, Rehash=0, Collisions=0/0=0%
+
+src/libdes_fifo.o: src/libdes_fifo.cpp Makefile
+#  Implicit rule search has been done.
+#  Implicit/static pattern stem: `src/libdes_fifo'
+#  Last modified 2022-07-14 12:22:36
+#  File has been updated.
+#  Successfully updated.
+# variable set hash-table stats:
+# Load=0/32=0%, Rehash=0, Collisions=0/0=0%
+#  commands to execute (from `Makefile', line 49):
+	$(CXX) $(WARNING) $(CXXFLAGS) -MMD -MP -c $< -o $@
+	
+
+# Not a target:
+src/libdes_network.cpp:
+#  Implicit rule search has been done.
+#  Last modified 2022-07-12 19:04:18
+#  File has been updated.
+#  Successfully updated.
+# variable set hash-table stats:
+# Load=0/32=0%, Rehash=0, Collisions=0/0=0%
+
+# Not a target:
+src/libdes_node.d:
+#  A default, MAKEFILES, or -include/sinclude makefile.
+#  Implicit rule search has been done.
+#  File does not exist.
+#  File has been updated.
+#  Failed to be updated.
+# variable set hash-table stats:
+# Load=0/32=0%, Rehash=0, Collisions=0/0=0%
+
+src/libdes_source.o: src/libdes_source.cpp Makefile
+#  Implicit rule search has been done.
+#  Implicit/static pattern stem: `src/libdes_source'
+#  Last modified 2022-07-14 12:22:41
+#  File has been updated.
+#  Successfully updated.
+# variable set hash-table stats:
+# Load=0/32=0%, Rehash=0, Collisions=0/0=0%
+#  commands to execute (from `Makefile', line 49):
+	$(CXX) $(WARNING) $(CXXFLAGS) -MMD -MP -c $< -o $@
+	
+
+# Not a target:
+src/libdes_network.d:
+#  A default, MAKEFILES, or -include/sinclude makefile.
+#  Implicit rule search has been done.
+#  File does not exist.
+#  File has been updated.
+#  Failed to be updated.
+# variable set hash-table stats:
+# Load=0/32=0%, Rehash=0, Collisions=0/0=0%
+
+libdes: src/libdes_event.o src/libdes_fifo.o src/libdes_is.o src/libdes_mm1.o src/libdes_network.o src/libdes_node.o src/libdes_queue.o src/libdes_sink.o src/libdes_source.o src/libdes_station.o
+#  Implicit rule search has not been done.
+#  Implicit/static pattern stem: `'
+#  File does not exist.
+#  File has been updated.
+#  Needs to be updated (-q is set).
+# automatic
+# @ := libdes
+# automatic
+# % := 
+# automatic
+# * := 
+# automatic
+# + := src/libdes_event.o src/libdes_fifo.o src/libdes_is.o src/libdes_mm1.o src/libdes_network.o src/libdes_node.o src/libdes_queue.o src/libdes_sink.o src/libdes_source.o src/libdes_station.o
+# automatic
+# | := 
+# automatic
+# < := src/libdes_event.o
+# automatic
+# ^ := src/libdes_event.o src/libdes_fifo.o src/libdes_is.o src/libdes_mm1.o src/libdes_network.o src/libdes_node.o src/libdes_queue.o src/libdes_sink.o src/libdes_source.o src/libdes_station.o
+# automatic
+# ? := src/libdes_event.o src/libdes_fifo.o src/libdes_is.o src/libdes_mm1.o src/libdes_network.o src/libdes_node.o src/libdes_queue.o src/libdes_sink.o src/libdes_source.o src/libdes_station.o
+# variable set hash-table stats:
+# Load=8/32=25%, Rehash=0, Collisions=2/15=13%
+#  commands to execute (from `Makefile', line 45):
+	$(CXX) $(WARNING) -shared $^ -o $@.$(SOEXT)
+	
+
+install:
+ 
+#  Phony target (prerequisite of .PHONY).
+#  Implicit rule search has not been done.
+#  File does not exist.
+#  File has not been updated.
+#  commands to execute (from `Makefile', line 41):
+	./install.sh
+	
+
+src/libdes_event.o: src/libdes_event.cpp Makefile
+#  Implicit rule search has been done.
+#  Implicit/static pattern stem: `src/libdes_event'
+#  Last modified 2022-07-14 12:22:35
+#  File has been updated.
+#  Successfully updated.
+# variable set hash-table stats:
+# Load=0/32=0%, Rehash=0, Collisions=0/0=0%
+#  commands to execute (from `Makefile', line 49):
+	$(CXX) $(WARNING) $(CXXFLAGS) -MMD -MP -c $< -o $@
+	
+
+# files hash-table stats:
+# Load=40/1024=4%, Rehash=0, Collisions=0/129=0%
+# VPATH Search Paths
+
+# No `vpath' search paths.
+
+# No general (`VPATH' variable) search path.
+
+# # of strings in strcache: 11
+# # of strcache buffers: 1
+# strcache size: total = 4096 / max = 4096 / min = 4096 / avg = 4096
+# strcache free: total = 3900 / max = 3900 / min = 3900 / avg = 3900
+
+# Finished Make data base on Thu Jul 14 15:04:19 2022
+
+ 

@@ -1,0 +1,27 @@
+{
+    "tasks": [
+        {
+            "type": "cppbuild",
+            "label": "Build test",
+            "command": "/usr/bin/gcc",
+            "args": [
+                "${workspaceFolder}/test/test.cpp",
+                "-o",
+                "${workspaceFolder}/test/test",
+                "-ldes",
+                "-lstdc++",
+                "-lm",
+                "-g",
+                "-std=c++20"
+            ],
+            "options": {
+                "cwd": "${fileDirname}"
+            },
+            "problemMatcher": [
+                "$gcc"
+            ],
+            "detail": "Build test."
+        }
+    ],
+    "version": "2.0.0"
+}

@@ -1,0 +1,24 @@
+1. Insert an handler object for the event to avoid custom sort method in queue
+
+		struct event_handler
+		{
+			event_handler(shared_ptr<event> p) : ptr_(p){}
+
+			void set_ptr_(shared_ptr<event> p)
+			{
+				ptr_  = p;
+			}
+
+			shared_ptr<event> get_ptr_() const
+			{
+				return ptr_;
+			}
+
+			bool operator< (const event_handler& rhs)
+			{
+				return *(ptr_.get()) < *(rhs.get_ptr_().get());
+			}
+
+			shared_ptr<event> ptr_;
+		};
+        

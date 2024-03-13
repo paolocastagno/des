@@ -1,0 +1,16 @@
+make --dry-run --always-make --keep-going --print-directory
+make: Entering directory `/Users/paolo/Documents/git/des'
+c++ -Wall -Wextra -std=c++2a -DDEBUG -g -ggdb  -MMD -MP -c src/libdes_event.cpp -o src/libdes_event.o
+c++ -Wall -Wextra -std=c++2a -DDEBUG -g -ggdb  -MMD -MP -c src/libdes_fifo.cpp -o src/libdes_fifo.o
+c++ -Wall -Wextra -std=c++2a -DDEBUG -g -ggdb  -MMD -MP -c src/libdes_is.cpp -o src/libdes_is.o
+c++ -Wall -Wextra -std=c++2a -DDEBUG -g -ggdb  -MMD -MP -c src/libdes_mm1.cpp -o src/libdes_mm1.o
+c++ -Wall -Wextra -std=c++2a -DDEBUG -g -ggdb  -MMD -MP -c src/libdes_network.cpp -o src/libdes_network.o
+c++ -Wall -Wextra -std=c++2a -DDEBUG -g -ggdb  -MMD -MP -c src/libdes_node.cpp -o src/libdes_node.o
+c++ -Wall -Wextra -std=c++2a -DDEBUG -g -ggdb  -MMD -MP -c src/libdes_queue.cpp -o src/libdes_queue.o
+c++ -Wall -Wextra -std=c++2a -DDEBUG -g -ggdb  -MMD -MP -c src/libdes_sink.cpp -o src/libdes_sink.o
+c++ -Wall -Wextra -std=c++2a -DDEBUG -g -ggdb  -MMD -MP -c src/libdes_source.cpp -o src/libdes_source.o
+c++ -Wall -Wextra -std=c++2a -DDEBUG -g -ggdb  -MMD -MP -c src/libdes_station.cpp -o src/libdes_station.o
+c++ -Wall -Wextra -shared src/libdes_event.o src/libdes_fifo.o src/libdes_is.o src/libdes_mm1.o src/libdes_network.o src/libdes_node.o src/libdes_queue.o src/libdes_sink.o src/libdes_source.o src/libdes_station.o -o libdes.dylib
+rm -f  src/libdes_event.d src/libdes_fifo.d src/libdes_is.d src/libdes_mm1.d src/libdes_network.d src/libdes_node.d src/libdes_queue.d src/libdes_sink.d src/libdes_source.d src/libdes_station.d
+make: Leaving directory `/Users/paolo/Documents/git/des'
+ 
