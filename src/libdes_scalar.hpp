@@ -54,6 +54,15 @@ class des::scalar : public des::observer {
             // cout << "v(" << cls << "): " << v.at(cls) << " n: " << n.at(cls) << " msg[" << observer_id << "] " << msg.get_value(observer_id) << endl;
         }
         /**
+         * @brief Updates the scalar value
+         * 
+         */
+        inline void update(double s, int cls)
+        {
+            v.at(cls) += s;
+            n.at(cls) += 1;
+        }
+        /**
          * @brief Compute population standard deviation according to algorithm presented here (https://en.wikipedia.org/wiki/Standard_deviation)
          * 
          * @param time 
@@ -62,6 +71,10 @@ class des::scalar : public des::observer {
          */
         inline double stddev(int cls)
         {
+            if(v.at(cls) == 0)
+            {
+                return __DBL_MAX__;
+            }
             double prev_a = a.at(cls);
             obs.at(cls) += 1;
             s.at(cls) = s.at(cls) + (v.at(cls)/static_cast<double>(n.at(cls))-s.at(cls))/static_cast<double>(obs.at(cls));
@@ -163,6 +176,16 @@ class des::scalar : public des::observer {
             return sum/static_cast<double>(run);
         }
         /**
+         * @brief Get the average value of the scalarfor the current run
+         * 
+         * @param cls 
+         * @return double 
+         */
+        inline double run_avg(int cls)
+        {
+            return v.at(cls)/static_cast<double>(n.at(cls));
+        }
+        /**
          * @brief 
          * 
          * @return string 
@@ -220,7 +243,7 @@ class des::scalar : public des::observer {
          */
         vector<int> n;
         /**
-         * @brief the scalar value (given by observation of the actual scala's value)
+         * @brief the scalar value (given by observation of the actual scalar's value)
          * 
          */
         vector<double> s;

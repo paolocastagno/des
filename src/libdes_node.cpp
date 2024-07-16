@@ -26,7 +26,6 @@ namespace des
 
 	node::~node()
 	{
-		cout << "~node(): begin removing " << get_sid() << endl;
 		if(observers > 0)
 		{
 			for(auto iter = observable_events.begin(); iter != observable_events.end(); iter++)
@@ -36,7 +35,6 @@ namespace des
 			observable_events.clear();
 			observers = 0;
 		}
-		cout << "~node(): done removing " << get_sid() << endl;
 	}
 
 	node::node(string desc) : node::node()
