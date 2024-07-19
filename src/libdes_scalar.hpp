@@ -69,17 +69,18 @@ class des::scalar : public des::observer {
          * @param cls 
          * @return double 
          */
-        inline double stddev(int cls)
+        inline double stddev(int cls, double normalization = 1.0)
         {
             if(v.at(cls) == 0)
             {
                 return __DBL_MAX__;
             }
             double prev_a = a.at(cls);
+            double value = v.at(cls)/normalization;
             obs.at(cls) += 1;
-            s.at(cls) = s.at(cls) + (v.at(cls)/static_cast<double>(n.at(cls))-s.at(cls))/static_cast<double>(obs.at(cls));
-            a.at(cls) = a.at(cls) + (v.at(cls)/static_cast<double>(n.at(cls)) - a.at(cls))/static_cast<double>(obs.at(cls));
-            q.at(cls) = q.at(cls) + (v.at(cls)/static_cast<double>(n.at(cls))-prev_a)*(v.at(cls)/static_cast<double>(n.at(cls))-a.at(cls));
+            s.at(cls) = s.at(cls) + (value/static_cast<double>(n.at(cls))-s.at(cls))/static_cast<double>(obs.at(cls));
+            a.at(cls) = a.at(cls) + (value/static_cast<double>(n.at(cls)) - a.at(cls))/static_cast<double>(obs.at(cls));
+            q.at(cls) = q.at(cls) + (value/static_cast<double>(n.at(cls))-prev_a)*(value/static_cast<double>(n.at(cls))-a.at(cls));
             if(obs.at(cls) < 2)
             {
                 return __DBL_MAX__;
