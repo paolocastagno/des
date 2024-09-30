@@ -82,7 +82,7 @@ int main() {
     snk.process_event();
 
     return 0;
-} -->
+}
 ```
 
 ## Contributing
@@ -95,4 +95,4 @@ This project is licensed under the MIT License. See the LICENSE file for details
 
 ## Contact
 
-For any questions or suggestions, please open an issue or contact the repository owner.
+For any questions or suggestions, please open an issue or contact the repository owner. -->
