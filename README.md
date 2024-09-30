@@ -1,4 +1,4 @@
-# Discrete Event Simulation (DES) Framework
+# libdes
 
 ### What is DES?
 
