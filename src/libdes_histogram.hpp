@@ -71,7 +71,7 @@ class des::histogram : public des::observer {
              * @param other 
              * @return bin 
              */
-            bin& operator=(bin& other)
+            bin& operator==(bin& other)
             {
                 // Guard self assignment
                 if (this == &other)
