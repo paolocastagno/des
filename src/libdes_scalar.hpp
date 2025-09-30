@@ -100,7 +100,7 @@ class des::scalar : public des::observer {
         {
             if(newrun)
             {
-                double scval = static_cast<double>(s.at(cls))/static_cast<double>(obs.at(cls));
+                double scval = static_cast<double>(s.at(cls)); // /static_cast<double>(obs.at(cls));
                 if(!isnan(scval))
                     s_runs.at(cls).push_back(scval);
             }
@@ -126,7 +126,7 @@ class des::scalar : public des::observer {
             {
                 if(newrun)
                 {
-                    s_runs.at(i).push_back(static_cast<double>(s.at(i)));
+                    s_runs.at(i).push_back(s.at(i));
                 }
                 v.at(i) = 0;
                 n.at(i) = 0;
