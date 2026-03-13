@@ -77,9 +77,14 @@ const string SIGNAL_NODE_ARRIVAL = "node_arrival";
 
 /**
  * @brief Signal: departure from the node
- * 
+ *
  */
 const string SIGNAL_NODE_DEPARTURE = "node_departure";
+/**
+ * @brief Signal: job enters service in the node
+ *
+ */
+const string SIGNAL_NODE_SERVICE = "node_service";
 /**
  * @brief Signal: departure from the node
  * 

@@ -21,6 +21,7 @@ namespace des
 		s_map.push_back(vector<int>(1,0));
 		observable_events.emplace(SIGNAL_NODE_ARRIVAL, list<shared_ptr<observer>>());
 		observable_events.emplace(SIGNAL_NODE_DEPARTURE, list<shared_ptr<observer>>());
+		observable_events.emplace(SIGNAL_NODE_SERVICE, list<shared_ptr<observer>>());
 		observers = 0;
 	}
 
@@ -97,7 +98,7 @@ namespace des
 	void node::reset(double time, vector<string> keys, bool newrun)
 	{
 		keys.push_back(NODE_ARRIVAL);
-		for(unsigned int i =0; i < in.size(); i++)
+		for(unsigned int i = 0; i < in.size(); i++)
 		{
 			in.at(i) = in.at(i) - out.at(i);
 			out.at(i) = 0;
@@ -273,9 +274,10 @@ namespace des
 			{
 				message msg(e -> get_map_info());
 				notify(SIGNAL_NODE_ARRIVAL, msg);
+				notify(SIGNAL_NODE_SERVICE, msg);
 			}
 			return true;
-		}	
+		}
 	}
 
 	shared_ptr<event> node::departure()
@@ -317,6 +319,12 @@ namespace des
 					// 5) Find the index of the serverSet the server id
 					ev -> emplace_info(EVENT_SERVER, sched);
 					s.at(sched) -> enqueue(ev, time);
+					// notify that the job entered service
+					if(observers != 0)
+					{
+						message msg(ev -> get_map_info());
+						notify(SIGNAL_NODE_SERVICE, msg);
+					}
 					//.at(sched).at(mvcls);
 				}
 				update_out(cls, time);
