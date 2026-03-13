@@ -1,4 +1,4 @@
-#/bin/sh
+#!/bin/sh
 if [ $(uname) == "Darwin" ]; then
     echo "OS type: macOS"
     SODIR=/usr/local/lib
@@ -28,7 +28,11 @@ sudo chmod $HFLG $HDIR/incbeta.hpp
 echo "Done!"
 
 echo "Copying dynamic libray (libdes.$SOEXT) to $SODIR"
-sudo mv libdes.$SOEXT $SODIR
+if [ ! -f libdes.$SOEXT ]; then
+    echo "Error: libdes.$SOEXT not found. Run 'make' first."
+    exit 1
+fi
+sudo cp libdes.$SOEXT $SODIR
 sudo chown $SOOWN $SODIR/libdes.$SOEXT
 sudo chmod $SOFLG $SODIR/libdes.$SOEXT
 echo "Done!"

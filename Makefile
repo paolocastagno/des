@@ -26,7 +26,7 @@ endif
 WARNING := -Wall -Wextra
 # .PHONY means these rules get executed even if
 # files of those names exist.
-.PHONY: all clean install
+.PHONY: all clean clean-dep clean-lib install
 # The first rule is the default, ie. "make",
 # "make all" and "make libdes" mean the same
 all: libdes clean-dep
@@ -37,7 +37,7 @@ clean-dep:
 			$(RM)  $(DEPENDS)
 clean-lib:
 			$(RM) libdes.$(SOEXT)
-install:	
+install: libdes
 			./install.sh
 
 # Linking the executable from the object files
