@@ -113,9 +113,8 @@ template <typename TT, template <typename> typename T> class des::station : publ
 		/**
 		 * @brief Data structure of size m * n, where m are the number of server in the queue and n is the number of jobs' classes
 		 * The element rng[i,j] is the service time distribution at the i-th server for the j-th jobs' class
-		 * 
+		 *
 		 */
         vector<vector<shared_ptr<T<TT>>>> rng;
-		bool measure_s;
 };
 #endif

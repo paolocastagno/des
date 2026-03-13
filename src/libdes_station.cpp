@@ -30,7 +30,6 @@ namespace des
 			s_map.push_back(vector<int>(rand_dist.at(0).size(), 1));
 			s.push_back(shared_ptr<queue>(new queue(s_places, p_service)));
 		}
-		measure_s = false;
 	}
 
 	template<typename TT, template <typename> typename T>
@@ -71,7 +70,6 @@ namespace des
 			s_map.push_back(vector<int>(rand_dist.at(0).size(), 1));
 			s.push_back(shared_ptr<queue>(new queue(s_places, p_service)));
 		}
-		measure_s = false;
 	}
 
 	template<typename TT, template <typename> typename T>
