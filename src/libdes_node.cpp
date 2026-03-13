@@ -170,18 +170,15 @@ namespace des
 
 	void node::update_out(unsigned int& cls, double& time)
 	{
-		if(in.at(cls) < out.at(cls))
+		if(in.at(cls) <= out.at(cls))
 		{
-			throw runtime_error("node::arrival (node::id " + std::to_string(get_id()) +") there have been more departures than arrivals. Check des::event handling!");
+			throw runtime_error("node::departure (node::id " + std::to_string(get_id()) +") there have been more departures than arrivals. Check des::event handling!");
 		}
-		// Compute the occupation of the node by job's class 
+		// Compute the occupation of the node by job's class
 		usage.at(cls) += (in.at(cls) - out.at(cls)) * (time - last_event.at(cls));
 		last_event.at(cls) = time;
-		// Update the number of arrivals for the cls class
+		// Update the number of departures for the cls class
 		++out.at(cls);
-		// Compute the occupation of the node by job's class 
-		usage.at(cls) += (in.at(cls) - out.at(cls)) * (time - last_event.at(cls));
-		last_event.at(cls) = time;
 	}
 
 	int node::idx_next_departure() const
@@ -395,18 +392,15 @@ namespace des
 			}
 		}
 		str += "\tThroughput\n";
-		for(unsigned int i = 0; i < last_event.size(); i++)
-		{
-			string nm = "dep_" + std::to_string(i);
-		}
 		if(last_event.size() >= 1)
 		{
 			double thr = 0.0;
+			double t_max = *max_element(last_event.begin(), last_event.end());
 			for(unsigned int i = 0; i < last_event.size(); i++)
 			{
-				thr += out.at(i); 
+				thr += out.at(i);
 			}
-			thr = thr/last_event.at(last_event.size()-1);
+			thr = thr / t_max;
 			str += "\t\t" + std::to_string(thr) + "\n";
 		}
 		return str;

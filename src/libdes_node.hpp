@@ -273,8 +273,8 @@ class des::node : public des::object, public des::observable
 		// ids generator
 		inline static unsigned int id_gen = 0;
 		// Measures
-        vector<int> in;
-        vector<int> out;
+        vector<long> in;
+        vector<long> out;
         vector<double> usage;
         vector<double> last_event;
 		// Utility methods
