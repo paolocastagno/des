@@ -7,7 +7,7 @@ ifeq ($(OS),Darwin)
     CXXFLAGS = -std=c++2a -ggdb
 	SOEXT = dylib
 	CSTD = -std=c++2a
-	DYFLAGS =
+	DYFLAGS = -install_name /usr/local/lib/libdes.dylib
 else
 	CXXFLAGS = -std=c++20 -g -ggdb --fPIC
 	SOEXT = so
@@ -42,7 +42,7 @@ install: libdes
 
 # Linking the executable from the object files
 libdes:  $(OBJECTS)
-			$(CXX) $(WARNING) -shared $^ -o $@.$(SOEXT)
+			$(CXX) $(WARNING) -shared $(DYFLAGS) $^ -o $@.$(SOEXT)
 -include $(DEPENDS)
 
 %.o: %.cpp Makefile

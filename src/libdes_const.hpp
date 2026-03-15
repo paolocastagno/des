@@ -64,10 +64,28 @@ const string EVENT_REJECT = "reject";
 const string NODE_ARRIVAL = "arrival_time";
 
 /**
+ * @brief Key used to lookup the time at which service started in the current node
+ * 
+ */
+const string NODE_SERVICE_START = "service_start_time";
+
+/**
  * @brief Key used to lookup the arrival time at the current node  
  * 
  */
 const string NODE_SOJOURN = "node_sojourn";
+
+/**
+ * @brief Key used to lookup the waiting time experienced in the current node
+ * 
+ */
+const string NODE_WAIT = "node_wait";
+
+/**
+ * @brief Key used to lookup the service time experienced in the current node
+ * 
+ */
+const string NODE_SERVICE = "node_service";
 
 /**
  * @brief Signal: arrival in the node

@@ -40,13 +40,28 @@ The **Discrete Event Simulation (DES)** C++ library is a framework designed to s
 - **Healthcare Systems**: Simulate patient flow through hospital departments, with waiting times, services, and resources being processed.
 - **Custom Simulation Models**: Due to its flexible nature, DES can be adapted for any event-driven system that needs simulation.
 
+## Documentation
+
+Full documentation is available in the [`docs/`](docs/README.md) folder:
+
+- [Getting Started](docs/getting-started.md)
+- [Architecture](docs/architecture.md)
+- [API Reference](docs/api/README.md)
+- [Examples](docs/examples/basic-network.md)
+
 ## Installation
 
 To compile the project, use the following commands:
 
 ```sh
-g++ -c prog.c
-g++ -o prog prog.o -ldes -lstdc++
+make
+```
+
+Then link your program against the library:
+
+```sh
+g++ -std=c++20 -c prog.cpp
+g++ -o prog prog.o -ldes
 ```
 
 ## Usage
@@ -55,44 +70,6 @@ g++ -o prog prog.o -ldes -lstdc++
 2. **Create and configure events, queues, and network nodes** as needed.
 3. **Run the simulation** and collect the results for analysis.
 
-## Example
-
-Here is a simple example of how to use the framework:
-```
-TBD
-```
-
-<!-- 
-```cpp
-#include "libdes.hpp"
-
-int main() {
-    // Create a source node
-    des::source src;
-
-    // Create a sink node
-    des::sink snk;
-
-    // Create a FIFO queue
-    des::fifo queue;
-
-    // Schedule events and run the simulation
-    src.schedule_event();
-    queue.enqueue_event();
-    snk.process_event();
-
-    return 0;
-}
-```
-
-## Contributing
-
-Contributions are welcome! Please fork the repository and submit pull requests.
-
-<!-- ## License
-
-This project is licensed under the MIT License. See the LICENSE file for details. -->
-
 ## Contact
 
-For any questions or suggestions, please open an issue or contact the repository owner. -->
+For any questions or suggestions, please open an issue or contact the repository owner.

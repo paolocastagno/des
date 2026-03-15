@@ -255,6 +255,7 @@ namespace des
 			// object::TraceLoc(source_location::current(), "SERVICE ", std::to_string(e->get_id()), " time ",
 			// 			 e->get_time(), " node ", std::to_string(get_id()));
 			e -> emplace_info(EVENT_SERVER, sched);
+			e -> emplace_info(NODE_SERVICE_START, time);
 			// 1) set the final time
 			e -> set_time(time + get_service(cls, sched));
 			// 2) add the arrival time to the event's information
@@ -292,7 +293,12 @@ namespace des
 			// ... and the current time
 			double time = e -> get_time();
 			// Update counters
-			e -> emplace_info(NODE_SOJOURN, time - e -> get_info(NODE_ARRIVAL).second);
+			double arrival_time = e -> get_info(NODE_ARRIVAL).second;
+			pair<bool, double> service_start_info = e -> get_info(NODE_SERVICE_START);
+			double service_start_time = service_start_info.first ? service_start_info.second : arrival_time;
+			e -> emplace_info(NODE_SOJOURN, time - arrival_time);
+			e -> emplace_info(NODE_WAIT, service_start_time - arrival_time);
+			e -> emplace_info(NODE_SERVICE, time - service_start_time);
 			// notify the departure to observers
 			if(observers != 0)
 			{
@@ -313,6 +319,7 @@ namespace des
 					unsigned int mvcls = ev -> get_cls();
 					// 4) Set the final time
 					ev -> set_time(time + get_service(mvcls, sched));	
+					ev -> emplace_info(NODE_SERVICE_START, time);
 					// 5) Find the index of the serverSet the server id
 					ev -> emplace_info(EVENT_SERVER, sched);
 					s.at(sched) -> enqueue(ev, time);
@@ -329,6 +336,7 @@ namespace des
 				e -> remove_info(EVENT_QUEUE);
 				e -> remove_info(EVENT_SERVER);
 				e -> remove_info(NODE_ARRIVAL);
+				e -> remove_info(NODE_SERVICE_START);
 				return e;
 			}
 			else
