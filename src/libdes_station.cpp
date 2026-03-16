@@ -32,6 +32,30 @@ namespace des
 		}
 	}
 
+	template <typename TT, template <typename> typename T>
+	station<TT, T>::station(vector<vector<shared_ptr<T<TT>>>> rand_dist,
+							unsigned int nserver,
+							unsigned int s_places,
+							unsigned int nqueue,
+							unsigned int q_places,
+							shared_ptr<policy> p_queue,
+							shared_ptr<policy> p_service,
+							node::service_pick_handler shfunc,
+							string description,
+							shared_ptr<mt19937_64> gen) :
+					station<TT, T>::station(rand_dist,
+							nserver,
+							s_places,
+							nqueue,
+							q_places,
+							p_queue,
+							p_service,
+							description,
+							gen)
+	{
+		set_service_pick_handler(shfunc);
+	}
+
 	template<typename TT, template <typename> typename T>
 	station<TT, T>::station(vector<vector<shared_ptr<T<TT>>>> rand_dist,
 							unsigned int nserver,
@@ -70,6 +94,24 @@ namespace des
 			s_map.push_back(vector<int>(rand_dist.at(0).size(), 1));
 			s.push_back(shared_ptr<queue>(new queue(s_places, p_service)));
 		}
+	}
+
+	template<typename TT, template <typename> typename T>
+	station<TT, T>::station(vector<vector<shared_ptr<T<TT>>>> rand_dist,
+							unsigned int nserver,
+							unsigned int s_places,
+							shared_ptr<policy> p_service,
+							node::service_pick_handler shfunc,
+							string description,
+							shared_ptr<mt19937_64> gen) :
+					station<TT, T>::station(rand_dist,
+							nserver,
+							s_places,
+							p_service,
+							description,
+							gen)
+	{
+		set_service_pick_handler(shfunc);
 	}
 
 	template<typename TT, template <typename> typename T>

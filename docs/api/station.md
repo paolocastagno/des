@@ -62,6 +62,61 @@ Returns the distribution object for class `cls` on server `idx`.
 `dequeue()` selects the next waiting event when a server becomes free.
 `schedule()` assigns an event to a server.
 
+The station can also use a **custom service-pick handler** to choose from which waiting queue the next job should be moved to service (for example strict class priority).
+
+Handler signature:
+
+```cpp
+int service_pick_handler(std::shared_ptr<des::event> trigger,
+                         int server_idx,
+                         const std::vector<std::vector<int>>& q_map,
+                         const std::vector<std::shared_ptr<des::queue>>& queues,
+                         std::shared_ptr<std::mt19937_64>& gen);
+```
+
+If no handler is provided, `des::station` keeps the default behavior.
+
+## Example: Strict class priority for service admission
+
+```cpp
+int class_priority_pick(std::shared_ptr<des::event> trigger,
+                        int server_idx,
+                        const std::vector<std::vector<int>>& q_map,
+                        const std::vector<std::shared_ptr<des::queue>>& queues,
+                        std::shared_ptr<std::mt19937_64>& gen)
+{
+    (void)trigger;
+    (void)server_idx;
+    (void)gen;
+
+    // Priority order: class 2 > class 0 > class 1
+    std::vector<int> prio{2, 0, 1};
+
+    int fallback = 0;
+    for (unsigned int qidx = 0; qidx < q_map.size(); ++qidx)
+    {
+        if (!q_map[qidx].empty()) fallback = static_cast<int>(qidx);
+    }
+
+    for (int cls : prio)
+    {
+        for (unsigned int qidx = 0; qidx < q_map.size(); ++qidx)
+        {
+            if (cls >= 0 && cls < static_cast<int>(q_map[qidx].size()) &&
+                q_map[qidx][cls] != 0 &&
+                queues[qidx]->in_queue() != 0)
+            {
+                return static_cast<int>(qidx);
+            }
+        }
+    }
+
+    return fallback;
+}
+```
+
+Pass this function pointer to a station constructor overload that accepts the custom handler.
+
 ---
 
 ## Example: M/M/2 Queue

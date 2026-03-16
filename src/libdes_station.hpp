@@ -36,6 +36,18 @@ template <typename TT, template <typename> typename T> class des::station : publ
 		 */
 		station(vector<vector<shared_ptr<T<TT>>>> rand_dist, unsigned int nserver, unsigned int s_places, shared_ptr<policy> p_server, string description, shared_ptr<mt19937_64> gen);
 		/**
+		 * @brief Construct a new des::station object with a custom service-pick handler.
+		 * 
+		 * @param rand_dist Service-time distributions [server][class]
+		 * @param nserver Number of servers
+		 * @param s_places Capacity per server queue
+		 * @param p_server Service queue policy
+		 * @param shfunc Custom handler selecting from which waiting queue to dequeue next job
+		 * @param description Station description
+		 * @param gen Shared random generator
+		 */
+		station(vector<vector<shared_ptr<T<TT>>>> rand_dist, unsigned int nserver, unsigned int s_places, shared_ptr<policy> p_server, node::service_pick_handler shfunc, string description, shared_ptr<mt19937_64> gen);
+		/**
 		 * @brief Construct a new des::station object. Every station object handles events according to a FIFO queue and a SingleServer server
 		 * 
 		 * @param r Vector specifying per class service rates 
@@ -49,6 +61,10 @@ template <typename TT, template <typename> typename T> class des::station : publ
 		 * @param gen The global std::mt19937 used to generate pseudo-random numbers
 		 */
 		station(vector<vector<shared_ptr<T<TT>>>> rand_dist, unsigned int nserver, unsigned int s_places, unsigned int nqueue, unsigned int q_places, shared_ptr<policy> p_queue, shared_ptr<policy> p_server, string description, shared_ptr<mt19937_64> gen);
+		/**
+		 * @brief Construct a new des::station object with explicit queue/server policies and custom service-pick handler.
+		 */
+		station(vector<vector<shared_ptr<T<TT>>>> rand_dist, unsigned int nserver, unsigned int s_places, unsigned int nqueue, unsigned int q_places, shared_ptr<policy> p_queue, shared_ptr<policy> p_server, node::service_pick_handler shfunc, string description, shared_ptr<mt19937_64> gen);
 		/**
 		 * @brief Construct a new des::station object. Every station object handles events according to a FIFO queue and a SingleServer server
 		 * 

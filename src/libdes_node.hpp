@@ -33,6 +33,7 @@ namespace des
 class des::node : public des::object, public des::observable
 {
 	public:
+		typedef int (*service_pick_handler)(shared_ptr<event>, int, const vector<vector<int>>&, const vector<shared_ptr<queue>>&, shared_ptr<mt19937_64>&);
 		// Constructor & destructor
 		/**
 		 * @brief Construct a new node::node object. Each node object is characterized by one or more policy specifying how to handle events
@@ -83,6 +84,15 @@ class des::node : public des::object, public des::observable
 		 * @param g The global mersenne twister random number generator used to generate events' service time
 		 */
 		node(unsigned int cls, string description, shared_ptr<mt19937_64> g);
+		/**
+		 * @brief Set the custom handler used to pick the next waiting queue when moving jobs to service.
+		 * 
+		 * @param handler function pointer. If nullptr, default dequeue() logic is used.
+		 */
+		inline void set_service_pick_handler(service_pick_handler handler)
+		{
+			handle_service_pick = handler;
+		}
 		/**
 		 * @brief Destroy the node object
 		 * 
@@ -258,6 +268,10 @@ class des::node : public des::object, public des::observable
 		 * @return an integer used to index the right queue in the s_map structure.
 		 */
 		virtual int dequeue(shared_ptr<event>& e, vector<vector<int>> s_map) = 0;
+		/**
+		 * @brief Default service selection handler. Returns the queue index selected by dequeue().
+		 */
+		virtual int shfunc(shared_ptr<event>& e, int sched, const vector<vector<int>>& qmap, const vector<shared_ptr<queue>>& queues, shared_ptr<mt19937_64>& g);
 	private:
 		// ids generator
 		inline static unsigned int id_gen = 0;
@@ -266,6 +280,10 @@ class des::node : public des::object, public des::observable
         vector<long> out;
         vector<double> usage;
         vector<double> last_event;
+		/**
+		 * @brief Optional custom callback used to select the queue index for the next job entering service.
+		 */
+		service_pick_handler handle_service_pick;
 		// Utility methods
 		/**
 		 * @brief Updates counters for a new arrival

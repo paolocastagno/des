@@ -11,7 +11,8 @@ namespace des
 		in(),
 		out(),
 		usage(),
-		last_event()
+		last_event(),
+		handle_service_pick(nullptr)
 	{
 		in.push_back(0);
 		out.push_back(0);
@@ -310,7 +311,14 @@ namespace des
 			if(!s.at(sched) -> is_full())
 			{
 				// 1) Find the index of the queue to pick the next event to serve
-				deq = dequeue(e, q_map);
+				if(handle_service_pick != nullptr)
+				{
+					deq = handle_service_pick(e, static_cast<int>(sched), q_map, q, gen);
+				}
+				else
+				{
+					deq = shfunc(e, static_cast<int>(sched), q_map, q, gen);
+				}
 				if(q.size() > 0 && q.at(deq) ->in_queue() != 0)
 				{
 					// 2) get the event
@@ -348,6 +356,14 @@ namespace des
 		{
 			throw runtime_error("node::departure (node::id " + std::to_string(get_id()) +") error dequeuing current event.\n");
 		}
+	}
+
+	int node::shfunc(shared_ptr<event>& e, int sched, const vector<vector<int>>& qmap, const vector<shared_ptr<queue>>& queues, shared_ptr<mt19937_64>& g)
+	{
+		(void)sched;
+		(void)queues;
+		(void)g;
+		return dequeue(e, qmap);
 	}
 
 	string node::to_string() const
