@@ -120,6 +120,22 @@ class des::node : public des::object, public des::observable
 			s = s_vec;
 		}
 		/**
+		 * @brief Set queue-to-class mapping matrix.
+		 * q_map[q][cls] != 0 means class cls can use queue q.
+		 */
+		inline void set_queue_map(const vector<vector<int>>& map)
+		{
+			q_map = map;
+		}
+		/**
+		 * @brief Set server-to-class mapping matrix.
+		 * s_map[srv][cls] != 0 means class cls can use server srv.
+		 */
+		inline void set_server_map(const vector<vector<int>>& map)
+		{
+			s_map = map;
+		}
+		/**
 		 * @brief Returns the number of events of the given class currently in queue
 		 * 
 		 * @return int 

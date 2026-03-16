@@ -54,6 +54,13 @@ class des::queue : public des::object
 		 */
         ~queue(){}
 		/**
+		 * @brief Returns the number of events currently stored in the queue.
+		 */
+		inline int size() const
+		{
+			return static_cast<int>(lst.size());
+		}
+		/**
 		 * @brief 
 		 * 
 		 * @return string 
