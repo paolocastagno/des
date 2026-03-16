@@ -173,7 +173,7 @@ class des::node : public des::object, public des::observable
 		inline int service_length()
 		{
 			int len = 0;
-			for(unsigned int i = 0; i < q.size(); i++)
+			for(unsigned int i = 0; i < s.size(); i++)
 				len += s.at(i) -> in_queue(); 
 			return len;
 		}
