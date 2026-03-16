@@ -5,6 +5,7 @@
 #include <memory>
 
 #include "libdes_observable.hpp"
+#include "libdes_message.hpp"
 
 using namespace std;
 
@@ -80,10 +81,17 @@ class des::observer
         }
         /**
          * @brief updates the state of the observer according to the received message
-         * 
-         * @param message 
+         *
+         * @param message
          */
         virtual void update(string message) = 0;
+        /**
+         * @brief updates the state of the observer from a message object directly,
+         * avoiding serialize/deserialize. Concrete observers should override this.
+         *
+         * @param msg
+         */
+        virtual void update(const des::message& msg) { update(msg.serialize()); }
         /**
          * @brief Check wheter the observer is associated with an observable entity
          * 

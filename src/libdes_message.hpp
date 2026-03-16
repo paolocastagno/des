@@ -67,9 +67,9 @@ class des::message
          * @param key 
          * @return double 
          */
-        inline double get_value(string key)
+        inline double get_value(const string& key) const
         {
-            unordered_map<string,double>::iterator it = key_value.find(key);
+            unordered_map<string,double>::const_iterator it = key_value.find(key);
             if(it != key_value.end())
             {
                 return it -> second;
@@ -103,9 +103,9 @@ class des::message
          * 
          * @return string 
          */
-        inline string serialize()
+        inline string serialize() const
         {
-            unordered_map<string, double>::iterator it = key_value.begin();
+            unordered_map<string, double>::const_iterator it = key_value.begin();
             string message = "";
             while(it != key_value.end())
             {

@@ -202,10 +202,9 @@ class des::node : public des::object, public des::observable
 			unordered_map<string, list<shared_ptr<observer>>>::iterator it = observable_events.find(signal);
 			if(it != observable_events.end())
 			{
-				string m = msg.serialize();
 				for(shared_ptr<observer> obs: it -> second)
 				{
-					obs.get()->update(m);
+					obs.get()->update(msg);
 				}
 			}
 		}
@@ -231,18 +230,8 @@ class des::node : public des::object, public des::observable
 		 */
 		vector<shared_ptr<queue>> s;
 		/**
-		 * @brief Holds all the vector observers
-		 * 
-		 */
-        unordered_map<string, list<shared_ptr<observer>>> observable_events;
-		/**
-		 * @brief keeps the information about attached observers
-		 * 
-		 */
-		int observers;
-		/**
 		 * @brief Pointer to the global std::random_device
-		 * 
+		 *
 		 */
 		shared_ptr<mt19937_64> gen;
 		/**

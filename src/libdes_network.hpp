@@ -11,6 +11,7 @@
 #include <string>
 #include <stdexcept>
 #include <list>
+#include <set>
 #include <vector>
 #include <random>
 #include <memory>
@@ -358,10 +359,9 @@ class des::network : public des::observable
 			unordered_map<string, list<shared_ptr<observer>>>::iterator it = observable_events.find(signal);
 			if(it != observable_events.end())
 			{
-				string m = msg.serialize();
 				for(shared_ptr<observer> obs: it -> second)
 				{
-					obs.get()->update(m);
+					obs.get()->update(msg);
 				}
 			}
 		}
@@ -437,6 +437,24 @@ class des::network : public des::observable
 		 * @param routing 
 		 */
 		int (*handle_forks)(shared_ptr<event>, const vector<vector<vector<double>>>&, shared_ptr<mt19937_64>&);
+		/**
+		 * @brief Min-heap index: {next_event_time, node_index}, kept in sync after every
+		 *        departure and arrival so that next_event() is O(log N) instead of O(N).
+		 */
+		set<pair<double, int>> event_heap;
+		/**
+		 * @brief Stores the time currently registered in event_heap for each node,
+		 *        needed to erase the old entry before re-inserting the updated one.
+		 */
+		vector<double> node_heap_time;
+		/**
+		 * @brief Re-synchronises event_heap for node idx after its next_event_time has changed.
+		 */
+		void update_heap(int idx);
+		/**
+		 * @brief Initialises event_heap and node_heap_time from the current node state.
+		 */
+		void init_heap();
 };
 
 #endif

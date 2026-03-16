@@ -26,6 +26,7 @@ namespace des
 					attach(SIGNAL_NET_ROUTING+nm, shared_ptr<scalar>(new scalar("flow"+nm,cls)));
 				}
 			}
+			init_heap();
 		}
 
 		network::network(vector<shared_ptr<node>> nds, vector<vector<vector<double>>> rtg,
@@ -96,21 +97,33 @@ namespace des
 
 	shared_ptr<event> network::next_event()
 	{
-		double min_time = __DBL_MAX__;
-		shared_ptr<node> tgt = nullptr;
-		for(shared_ptr<node> n : nodes)
+		if(event_heap.empty()) return nullptr;
+		auto it = event_heap.begin();
+		int idx = it->second;
+		event_heap.erase(it);
+		node_heap_time[idx] = __DBL_MAX__;
+		shared_ptr<event> e = nodes.at(idx)->departure();
+		node_heap_time[idx] = nodes.at(idx)->next_event_time();
+		event_heap.emplace(node_heap_time[idx], idx);
+		return e;
+	}
+
+	void network::init_heap()
+	{
+		event_heap.clear();
+		node_heap_time.resize(nodes.size());
+		for(unsigned int i = 0; i < nodes.size(); i++)
 		{
-			if(n -> next_event_time() < min_time)
-			{
-				min_time = n -> next_event_time();
-				tgt = n;
-			}
+			node_heap_time[i] = nodes.at(i)->next_event_time();
+			event_heap.emplace(node_heap_time[i], i);
 		}
-		if(tgt != nullptr)
-		{
-			return tgt -> departure(); 
-		}
-		return nullptr;
+	}
+
+	void network::update_heap(int idx)
+	{
+		event_heap.erase({node_heap_time[idx], idx});
+		node_heap_time[idx] = nodes.at(idx)->next_event_time();
+		event_heap.emplace(node_heap_time[idx], idx);
 	}
 
 	pair<bool, int> network::hbfunc(shared_ptr<event>, int destination, const vector<vector<vector<double>>>& route, shared_ptr<mt19937_64>& g)
@@ -180,7 +193,8 @@ namespace des
 					{
 						throw invalid_argument("Measurable event " + nm + " is not defined in network " + get_sid());
 					}
-					// Event successfully enqueued
+					// Event successfully enqueued; update the heap for the destination node
+					update_heap(dest);
 					e -> emplace_info(EVENT_NODE, dest);
 				}
 				else
@@ -218,7 +232,8 @@ namespace des
 								cond = nodes.at(reroute.second) -> arrival(e);
 								if(cond)
 								{
-									e -> emplace_info(EVENT_NODE, reroute.second);
+										update_heap(reroute.second);
+										e -> emplace_info(EVENT_NODE, reroute.second);
 								}
 								else
 								{
@@ -246,6 +261,7 @@ namespace des
 		{
 			n -> reset(time, keys, newrun);
 		}
+		init_heap();
 	}
 
 	string network::to_string() const

@@ -42,7 +42,7 @@ class des::scalar : public des::observer {
         }
         /**
          * @brief Updates the scalar value
-         * 
+         *
          */
         inline void update(string m) override
         {
@@ -52,6 +52,16 @@ class des::scalar : public des::observer {
             n.at(cls) += 1;
             // cout << m << " --- " << msg.get_value(observer_id) << endl;
             // cout << "v(" << cls << "): " << v.at(cls) << " n: " << n.at(cls) << " msg[" << observer_id << "] " << msg.get_value(observer_id) << endl;
+        }
+        /**
+         * @brief Updates the scalar value directly from a message object (no serialize/deserialize)
+         *
+         */
+        inline void update(const des::message& msg) override
+        {
+            int cls = static_cast<int>(msg.get_value(EVENT_CLS));
+            v.at(cls) += msg.get_value(observer_id);
+            n.at(cls) += 1;
         }
         /**
          * @brief Updates the scalar value
