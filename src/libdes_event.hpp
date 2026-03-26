@@ -58,7 +58,12 @@ class des::event : public des::object
 		 */
 		inline int get_cls() const
 		{
-			return cls;
+			auto cls_it = info.find(EVENT_CLS);
+			if(cls_it == info.end())
+			{
+				return 0;
+			}
+			return static_cast<int>(cls_it -> second);
 		}
 		/**
 		 * @brief Set the class the event belongs to
@@ -67,8 +72,7 @@ class des::event : public des::object
 		 */
 		inline void set_cls(int c)
 		{
-			cls = c;
-			set_info(EVENT_CLS, cls);
+			emplace_info(EVENT_CLS, static_cast<double>(c));
 		}
 		/**s
 		 * @brief Sets the time the event will happen
@@ -205,9 +209,9 @@ class des::event : public des::object
 		 */
 		void clear() override
 		{
-			cls = 0;
 			info.clear();
 			set_info(EVENT_ID, get_id());
+			set_info(EVENT_CLS, 0);
 		}
 		/**
 		 * @brief Check wheter the event has already been initilized or not
@@ -232,8 +236,6 @@ class des::event : public des::object
 	private:
 		// ids generator
 		inline static unsigned int id_gen = 0;
-		// event's class
-		int cls;
 		// event's info
 		unordered_map<string, double> info;
 };
