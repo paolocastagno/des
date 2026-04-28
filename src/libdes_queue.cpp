@@ -74,6 +74,29 @@ namespace des{
         return ret;
     }
 
+    shared_ptr<event> queue::dequeue(double time)
+    {
+        if(lst.size() == 0)
+        {
+            throw runtime_error("des::queue trying to dequeue from an empty queue");
+        }
+        // Notify the policy before popping so it can update remaining events.
+        // For policies that do not override on_dequeue this is a no-op.
+        p->on_dequeue(lst, time);
+        shared_ptr<event> ret;
+        if(p -> front())
+        {
+            ret = lst.front();
+            lst.pop_front();
+        }
+        else
+        {
+            ret = lst.back();
+            lst.pop_back();
+        }
+        return ret;
+    }
+
     double queue::min_time() const
     {
         if(lst.size() > 0)

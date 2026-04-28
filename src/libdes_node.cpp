@@ -285,14 +285,15 @@ namespace des
 		int deq = idx_next_departure();
 		if(s.at(deq) -> in_queue() != 0)
 		{
-			// Get the event
-			shared_ptr<event> e = s.at(deq) -> dequeue();
+			// Read the departure time before popping so time-aware policies
+			// (e.g. processor sharing) can update the remaining jobs in the server.
+			double time = s.at(deq) -> min_time();
+			// Get the event (on_dequeue hook is called inside dequeue(time))
+			shared_ptr<event> e = s.at(deq) -> dequeue(time);
 			// object::TraceLoc(source_location::current(), "DEPARTURE ", std::to_string(e->get_id()), " time ",
 			// 				 e -> get_time(), " node ", std::to_string(get_id()));
 			// ..., its class id
 			unsigned int cls = e -> get_cls();
-			// ... and the current time
-			double time = e -> get_time();
 			// Update counters
 			double arrival_time = e -> get_info(NODE_ARRIVAL).second;
 			pair<bool, double> service_start_info = e -> get_info(NODE_SERVICE_START);

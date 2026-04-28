@@ -27,6 +27,15 @@ class des::policy : public des::object
 		virtual bool update(shared_ptr<event> e, list<shared_ptr<event>>& l, unsigned int positions)=0;
 		virtual bool update(shared_ptr<event> e, list<shared_ptr<event>>& l, double time)=0;
 		virtual bool front()=0;
+		/**
+		 * @brief Called by queue::dequeue(time) before popping the front/back element.
+		 *        Policies that need to update remaining events on departure (e.g. processor sharing)
+		 *        override this. The default is a no-op so existing policies are unaffected.
+		 *
+		 * @param l   the full list of events still in the queue (including the one about to leave)
+		 * @param time current simulation time (= departure time of the leaving job)
+		 */
+		virtual void on_dequeue(list<shared_ptr<event>>& l, double time) {}
 		inline string get_description() const
 		{
 			return description;

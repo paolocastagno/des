@@ -71,11 +71,20 @@ class des::queue : public des::object
         bool enqueue(shared_ptr<event> e, double time);
         /**
 		 * @brief Dequeues one job
-		 * 
+		 *
          * @return the dequeued job
-		 * 
+		 *
 		 */
         shared_ptr<event> dequeue();
+        /**
+		 * @brief Dequeues one job, notifying the policy of the current time before popping.
+		 *        This allows time-aware policies (e.g. processor sharing) to update the
+		 *        remaining departure times of the jobs that stay in the queue.
+		 *
+		 * @param time current simulation time (departure time of the leaving job)
+         * @return the dequeued job
+		 */
+        shared_ptr<event> dequeue(double time);
         // Utility methods
         /**
         * @brief Returns the minimum time at which an event has happened
