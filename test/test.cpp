@@ -86,11 +86,7 @@ int main()
             net.route(e, sim_time);
         }
 
-        // sojourn->run_avg(0) is the sample mean sojourn for this run.
-        // Calling stddev(0) once updates the internal cross-run mean (s)
-        // so that the subsequent net.reset() can store it for CI computation.
-        double mean_soj = sojourn->run_avg(0);
-        sojourn->stddev(0);
+        double mean_soj = sojourn->mean(0);
 
         cout << "Run " << run
              << "  sim_time = " << sim_time

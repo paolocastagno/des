@@ -22,6 +22,9 @@ else
     CXXFLAGS=$(CSTD) -O3 -ggdb $(DYFLAGS)
 endif
 
+# Use local source headers, not installed ones
+INCLUDES := -I src
+
 # ADD MORE WARNINGS!
 WARNING := -Wall -Wextra
 # .PHONY means these rules get executed even if
@@ -46,7 +49,7 @@ libdes:  $(OBJECTS)
 -include $(DEPENDS)
 
 %.o: %.cpp Makefile
-		$(CXX) $(WARNING) $(CXXFLAGS) -MMD -MP -c $< -o $@
+		$(CXX) $(WARNING) $(CXXFLAGS) $(INCLUDES) -MMD -MP -c $< -o $@
 
 # test: $(CXX) $(WARNING) $(CXXFLAGS) 
 # For any doubts check 

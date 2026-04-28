@@ -215,6 +215,22 @@ class des::network : public des::observable
 			}
 		}
 		/**
+		 * @brief Get the nth observer attached to a signal (0-based index).
+		 */
+		inline shared_ptr<observer> get_observer(const string& signal, unsigned int idx)
+		{
+			auto fnd = observable_events.find(signal);
+			if(fnd == observable_events.end())
+				throw invalid_argument("Signal " + signal + " not found in network " + get_sid());
+			auto it = fnd->second.begin();
+			for(unsigned int i = 0; i < idx; ++i)
+			{
+				if(++it == fnd->second.end())
+					throw std::out_of_range("Observer index " + std::to_string(idx) + " out of range");
+			}
+			return *it;
+		}
+		/**
 		 * @brief Get the flow routed from source towards destination
 		 * 
 		 * @param source index of the source
