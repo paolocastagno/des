@@ -43,7 +43,8 @@ des::observer
 
 des::policy
 ├── des::fifo
-└── des::is
+├── des::is
+└── des::ps
 
 des::message
 ```
@@ -73,8 +74,9 @@ Queue behaviour is encapsulated in a `des::policy` subclass. The built-in polici
 |---|---|
 | `des::fifo` | First-In First-Out |
 | `des::is` | Infinite Server (no waiting) |
+| `des::ps` | Processor Sharing / Generalized Processor Sharing (GPS) |
 
-Custom disciplines are implemented by subclassing `des::policy` and overriding the three `update()` overloads and `front()`.
+Custom disciplines are implemented by subclassing `des::policy` and overriding the three `update()` overloads, `front()`, and optionally `on_dequeue()`. The `on_dequeue(list, time)` hook is called by `queue::dequeue(time)` before the departing element is removed, giving the policy the opportunity to update the remaining events (as `des::ps` does to rescale departure times).
 
 ### 4. Template-Based Distributions (Station)
 

@@ -119,6 +119,44 @@ Pass this function pointer to a station constructor overload that accepts the cu
 
 ---
 
+## Example: Processor Sharing (PS) Station
+
+A PS station has a single logical server with unlimited capacity and a `des::ps` policy. Every arriving job enters service immediately and shares the CPU equally with all other jobs present.
+
+```cpp
+#include "libdes_ps.hpp"
+
+auto mu = std::make_shared<exponential_distribution<double>>(1.0);
+
+auto ps_sta = std::make_shared<des::station<double, exponential_distribution>>(
+    std::vector<std::vector<std::shared_ptr<exponential_distribution<double>>>>{{mu}},
+    1,                                          // 1 server
+    std::numeric_limits<unsigned int>::max(),   // unlimited → never full
+    std::make_shared<des::ps>(),
+    "PS",
+    gen);
+```
+
+For **GPS** with two classes where class 0 receives twice the CPU share of class 1:
+
+```cpp
+// dist[server][class]
+auto mu0 = std::make_shared<exponential_distribution<double>>(2.0);
+auto mu1 = std::make_shared<exponential_distribution<double>>(1.0);
+
+auto gps_sta = std::make_shared<des::station<double, exponential_distribution>>(
+    std::vector<std::vector<std::shared_ptr<exponential_distribution<double>>>>{
+        {mu0, mu1}  // server 0: class 0 and class 1 distributions
+    },
+    1,
+    std::numeric_limits<unsigned int>::max(),
+    std::make_shared<des::ps>(std::vector<double>{2.0, 1.0}),  // weights per class
+    "GPS",
+    gen);
+```
+
+---
+
 ## Example: M/M/2 Queue
 
 ```cpp
