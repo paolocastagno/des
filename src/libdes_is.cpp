@@ -5,14 +5,14 @@ namespace des{
 
 	inline bool is::update(shared_ptr<event> e, list<shared_ptr<event>>& l, unsigned int positions)
 	{
-		if(l.size() < positions)
-			return true;
-		return false;
+		// IS: infinite server — always admit, regardless of configured capacity.
+		return true;
 	}
 
 	inline bool is::update(shared_ptr<event> e, list<shared_ptr<event>>& l, unsigned int positions, double rate)
 	{
-		return update(e,l, positions);
+		// IS: always admit.
+		return true;
 	}
 
 	inline bool is::update(shared_ptr<event> e, list<shared_ptr<event>>& l, double rate)
