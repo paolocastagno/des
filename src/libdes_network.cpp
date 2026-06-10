@@ -161,7 +161,7 @@ namespace des
 		}
 	}
 
-	void network::route(shared_ptr<event> e, const double& time)
+	void network::route(shared_ptr<event> e)
 	{
 		pair<bool, double> node = e -> get_info(EVENT_NODE);
 		if(!node.first)
@@ -170,6 +170,7 @@ namespace des
 		}
 		else
 		{
+			int source = static_cast<int>(node.second);
 			int dest;
 			if(handle_forks != nullptr)
 			{
@@ -179,19 +180,21 @@ namespace des
 			{
 				dest = hffunc(e, routing, gen);
 			}
-			if(dest > 0  && static_cast<unsigned int>(dest) < routing.at(node.second).size())
+
+			if(dest > 0  && static_cast<unsigned int>(dest) < routing.at(source).size())
 			{
+				e -> emplace_info(EVENT_NODE, dest);
 				if(nodes.at(dest) -> arrival(e))
 				{
 					// Count the routing choice
-					string nm = "_" + std::to_string(static_cast<int>(node.second)) + "_" + std::to_string(dest);
+					string nm = "_" + std::to_string(source) + "_" + std::to_string(dest);
 					if(observers != 0)
 					{
 						std::unordered_map<string,std::list<std::shared_ptr<observer>>>::iterator fnd = observable_events.find(SIGNAL_NET_ROUTING+nm);
 						if(fnd != observable_events.end())
 						{
 							std::list<shared_ptr<observer>>::iterator lst = fnd->second.begin();
-							double flw = static_cast<double>(dynamic_cast<counter*>((*lst).get()) -> get(e->get_cls())) / e->get_time();
+							double flw = static_cast<double>(dynamic_cast<counter*>((*lst).get()) -> get(e->get_cls()) + 1) / e->get_time();
 							unordered_map<string,double> info = e->get_map_info();
 							info.insert({"flow"+nm, flw});
 							message m(info);
@@ -204,10 +207,10 @@ namespace des
 					}
 					// Event successfully enqueued; update the heap for the destination node
 					update_heap(dest);
-					e -> emplace_info(EVENT_NODE, dest);
 				}
 				else
 				{
+					e -> emplace_info(EVENT_NODE, source);
 					// handle block
 					if(handle_block != nullptr)
 					{
@@ -220,14 +223,14 @@ namespace des
 							if(reroute.first)
 							{
 								// Count the routing choice
-								string nm = "_" + std::to_string(static_cast<int>(node.second)) + "_" + std::to_string(dest);
+								string nm = "_" + std::to_string(source) + "_" + std::to_string(dest);
 								if(observers != 0)
 								{
-									std::unordered_map<string,std::list<std::shared_ptr<observer>>>::iterator fnd = observable_events.find(nm);
+									std::unordered_map<string,std::list<std::shared_ptr<observer>>>::iterator fnd = observable_events.find(SIGNAL_NET_ROUTING+nm);
 									if(fnd != observable_events.end())
 									{
 										std::list<shared_ptr<observer>>::iterator lst = fnd->second.begin();
-										double flw = static_cast<double>(dynamic_cast<counter*>((*lst).get()) -> get(e->get_cls())) / e->get_time();
+										double flw = static_cast<double>(dynamic_cast<counter*>((*lst).get()) -> get(e->get_cls()) + 1) / e->get_time();
 										unordered_map<string,double> info = e->get_map_info();
 										info.insert({"flow"+nm, flw});
 										message m(info);
@@ -238,14 +241,15 @@ namespace des
 								{
 									throw invalid_argument("Measurable event " + nm + " is not defined in network " + get_sid());
 								}
+								e -> emplace_info(EVENT_NODE, reroute.second);
 								cond = nodes.at(reroute.second) -> arrival(e);
 								if(cond)
 								{
-										update_heap(reroute.second);
-										e -> emplace_info(EVENT_NODE, reroute.second);
+									update_heap(reroute.second);
 								}
 								else
 								{
+									e -> emplace_info(EVENT_NODE, source);
 									reroute.first = false;
 								}
 							}

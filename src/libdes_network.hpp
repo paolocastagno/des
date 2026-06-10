@@ -96,9 +96,8 @@ namespace des
 			 * destination node's heap entry and notify network routing observers.
 			 *
 			 * @param e Event that just departed from its current node.
-			 * @param time Current simulation time.
 			 */
-	        void route(shared_ptr<event> e, const double& time);
+	        void route(shared_ptr<event> e);
 			/**
 			 * @brief Dequeue and return the next event scheduled anywhere in the network.
 			 *
