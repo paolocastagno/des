@@ -24,134 +24,99 @@ namespace des
 	class network;
 }
 
-class des::network : public des::observable
-{
-	public:
-		// typedef function<bool(event*, const vector<shared_ptr<node>>&)>Handler;
-		// Constructors
-		network(){}
-		/**
-		 * @brief Construct a new network object
-		 * 
-		 * @param nds vector of nodes
-		 * @param rtg the routing matrix
-		 * @param g pseudo-random number generation
-		 * 
-		 */
-		network(vector<shared_ptr<node>> nds, vector<vector<vector<double>>> rtg, shared_ptr<mt19937_64>& g);
-		/**
-		 * @brief Construct a new network object
-		 * 
-		 * @param nds vector of nodes
-		 * @param rtg the routing matrix 
-		 * @param g pseudo-random number generation
-		 * @param hffunc function pointer used to handle forks 
-		 * 
-		 */
-		network(vector<shared_ptr<node>> nds, vector<vector<vector<double>>> rtg,
-				int (*hffunc)(shared_ptr<event>, const vector<vector<vector<double>>>&, shared_ptr<mt19937_64>&),
-				shared_ptr<mt19937_64>& g);
-		/**
-		 * @brief Construct a new network object
-		 * 
-		 * @param nds vector of nodes
-		 * @param rtg the routing matrix 
-		 * @param g pseudo-random number generation
-		 * @param hbfunc function pointer used to handle blocks at nodes
-		 * 
-		 */
-		network(vector<shared_ptr<node>> nds, vector<vector<vector<double>>> rtg, 
-				pair<bool, int> (*hbfunc)(shared_ptr<event>, int,
-										const vector<vector<vector<double>>>&, shared_ptr<mt19937_64>&),
-				shared_ptr<mt19937_64>& g);
-		/**
-		 * @brief Construct a new network object
-		 * 
-		 * @param nds vector of nodes
-		 * @param rtg the routing matrix 
-		 * @param g pseudo-random number generation
-		 * @param hffunc function pointer used to handle forks 
-		 * 
-		 */
-		network(vector<shared_ptr<node>> nds, vector<vector<vector<double>>> rtg,
-				int (*hffunc)(shared_ptr<event>, const vector<vector<vector<double>>>&, shared_ptr<mt19937_64>&),
-				pair<bool, int> (*hbfunc)(shared_ptr<event>, int,
-										const vector<vector<vector<double>>>&, shared_ptr<mt19937_64>&),
-				shared_ptr<mt19937_64>& g);
-		/**
-		 * @brief Construct a new network object
-		 * 
-		 * @param nds vector of nodes
-		 * @param rtg the routing matrix
-		 * @param rtg_failure the routing matrix for jobs not admitted in the destination des::node
-		 * @param const_handler unordered_multimap mapping the des::node's index and the des::Constraint::cons_key to the des::event::cls and the function pointer used to handle the des::Constraint
-		 * The function does not return a boolean, if true the Constraint is removed, The parameters are:
-		 * * const double&: reference to des::Scheduler::time 
-		 * * Constraint*: reference to des::Constraint expressing the constraint to the event
-		 * * const vector<node>&: reference to des::network::nodes
-		 */
-		// network(vector<shared_ptr<node>> nds, vector<vector<vector<double>>> rtg, vector<vector<vector<pair<shared_ptr<Constraint>, function<bool(event*, const vector<shared_ptr<node>>&)>>>>>  const_handler, shared_ptr<mt19937_64>& g);
-		/**
-		 * @brief Construct a new network object
-		 * 
-		 * @param nds vector of nodes
-		 * @param rtg the routing matrix
-		 * @param rtg_failure the routing matrix for jobs not admitted in the destination des::node
-		 * @param const_handler unordered_multimap mapping the des::node's index and the des::Constraint::cons_key to the des::event::cls and the function pointer used to handle the des::Constraint
-		 * The function does not return a boolean, if true the Constraint is removed, The parameters are:
-		 * * event*: pointer to the des::event associated with the des::Constraint
-		 * * Constraint*: reference to des::Constraint expressing the constraint to the event
-		 * * const vector<node>&: reference to des::network::nodes
-		 */
-		// network(vector<shared_ptr<node>> nds, vector<vector<vector<double>>> rtg, vector<vector<vector<double>>> rtg_fail, vector<vector<vector<pair<shared_ptr<Constraint>, function<bool(event*, const vector<shared_ptr<node>>&)>>>>>  const_handler, shared_ptr<mt19937_64>& g);
-		/**
-		 * @brief Virtual function implementing the routing logic
-		 * 
-		 * @param e event to route
-		 * @param time global clock
-		 */
-        void route(shared_ptr<event> e, const double& time);
-		/**
-		 * @brief Get the reference to the next event to handle
-		 * 
-		 * @return shared_ptr<event> next event
-		 * 
-		 **/
-		shared_ptr<event> next_event();
-		/**
-		 * @brief Get the number of event routed from source towards destination (in the current run)
-		 * 
-		 * @param source index of the source
-		 * @param index of the destintion
-		 * @param cls class of events 
-		 * 
-		 * @return int 
-		 */
-		// inline int get_count(int source, int destination, int cls)
-		// {
-		// 	string nm = SIGNAL_NET_ROUTING + "_" + std::to_string(source) + "_" + std::to_string(destination);
-		// 	std::unordered_map<string,std::list<std::shared_ptr<observer>>>::iterator fnd = observable_events.find(nm);
-		// 	if(fnd != observable_events.end())
-		// 	{
-		// 		//The second element of the list is the observer for the flow
-		// 		std::list<shared_ptr<observer>>::iterator lst = fnd->second.begin();
-		// 		return dynamic_cast<counter*>((*lst).get()) -> get(cls);
-		// 	}
-		// 	else
-		// 	{
-		// 		throw invalid_argument("Measurable event " + nm + " is not defined in network " + get_sid());
-		// 	}
-		// }
-		/**
-		 * @brief Get the flow routed from source towards destination (in the current run)
-		 * 
-		 * @param source index of the source
-		 * @param index of the destintion
-		 * @param cls class of events 
-		 * 
-		 * @return double 
-		 */
-		inline double flow(int source, int destination, int cls)
+	/**
+	 * @brief Discrete-event network coordinator.
+	 *
+	 * A network owns the ordered list of nodes participating in a simulation and
+	 * the routing tensor used to move departing events to their next destination.
+	 * It also keeps network-level observers for per-edge counts and flow estimates.
+	 */
+	class des::network : public des::observable
+	{
+		public:
+			/**
+			 * @brief Construct an empty network.
+			 */
+			network(){}
+			/**
+			 * @brief Construct a network using the default routing and blocking handlers.
+			 *
+			 * @param nds Nodes indexed by position; routing destinations refer to these indices.
+			 * @param rtg Routing probabilities as rtg[source][destination][class].
+			 * @param g Shared pseudo-random generator used by routing decisions.
+			 */
+			network(vector<shared_ptr<node>> nds, vector<vector<vector<double>>> rtg, shared_ptr<mt19937_64>& g);
+			/**
+			 * @brief Construct a network with a custom routing/fork handler.
+			 *
+			 * @param nds Nodes indexed by position; routing destinations refer to these indices.
+			 * @param rtg Routing probabilities as rtg[source][destination][class].
+			 * @param hffunc Function used to choose the next destination for a departed event.
+			 * @param g Shared pseudo-random generator used by routing decisions.
+			 */
+			network(vector<shared_ptr<node>> nds, vector<vector<vector<double>>> rtg,
+					int (*hffunc)(shared_ptr<event>, const vector<vector<vector<double>>>&, shared_ptr<mt19937_64>&),
+					shared_ptr<mt19937_64>& g);
+			/**
+			 * @brief Construct a network with a custom blocking handler.
+			 *
+			 * @param nds Nodes indexed by position; routing destinations refer to these indices.
+			 * @param rtg Routing probabilities as rtg[source][destination][class].
+			 * @param hbfunc Function used when a destination node rejects an event.
+			 * @param g Shared pseudo-random generator used by routing decisions.
+			 */
+			network(vector<shared_ptr<node>> nds, vector<vector<vector<double>>> rtg,
+					pair<bool, int> (*hbfunc)(shared_ptr<event>, int,
+											const vector<vector<vector<double>>>&, shared_ptr<mt19937_64>&),
+					shared_ptr<mt19937_64>& g);
+			/**
+			 * @brief Construct a network with custom routing and blocking handlers.
+			 *
+			 * @param nds Nodes indexed by position; routing destinations refer to these indices.
+			 * @param rtg Routing probabilities as rtg[source][destination][class].
+			 * @param hffunc Function used to choose the next destination for a departed event.
+			 * @param hbfunc Function used when a destination node rejects an event.
+			 * @param g Shared pseudo-random generator used by routing decisions.
+			 */
+			network(vector<shared_ptr<node>> nds, vector<vector<vector<double>>> rtg,
+					int (*hffunc)(shared_ptr<event>, const vector<vector<vector<double>>>&, shared_ptr<mt19937_64>&),
+					pair<bool, int> (*hbfunc)(shared_ptr<event>, int,
+											const vector<vector<vector<double>>>&, shared_ptr<mt19937_64>&),
+					shared_ptr<mt19937_64>& g);
+			// Constraint-handler constructors are kept here as design notes for a
+			// future extension, but the Constraint type is not part of this build.
+			// network(vector<shared_ptr<node>> nds, vector<vector<vector<double>>> rtg, vector<vector<vector<pair<shared_ptr<Constraint>, function<bool(event*, const vector<shared_ptr<node>>&)>>>>>  const_handler, shared_ptr<mt19937_64>& g);
+			// network(vector<shared_ptr<node>> nds, vector<vector<vector<double>>> rtg, vector<vector<vector<double>>> rtg_fail, vector<vector<vector<pair<shared_ptr<Constraint>, function<bool(event*, const vector<shared_ptr<node>>&)>>>>>  const_handler, shared_ptr<mt19937_64>& g);
+			/**
+			 * @brief Route a departed event to its next node.
+			 *
+			 * The source node is read from @c EVENT_NODE on @p e. The selected
+			 * destination is produced by the custom routing handler, when present, or
+			 * by the default routing-table sampler. Successful arrivals update the
+			 * destination node's heap entry and notify network routing observers.
+			 *
+			 * @param e Event that just departed from its current node.
+			 * @param time Current simulation time.
+			 */
+	        void route(shared_ptr<event> e, const double& time);
+			/**
+			 * @brief Dequeue and return the next event scheduled anywhere in the network.
+			 *
+			 * The heap is synchronized lazily if it is empty, which supports callers that
+			 * inject the first event directly into a node after constructing the network.
+			 *
+			 * @return Next event to route, or @c nullptr when no pending event exists.
+			 **/
+			shared_ptr<event> next_event();
+			/**
+			 * @brief Return the current-run flow observer value for an edge and class.
+			 *
+			 * @param source Source node index.
+			 * @param destination Destination node index.
+			 * @param cls Event class index.
+			 * @return Current-run scalar value stored by the edge flow observer.
+			 */
+			inline double flow(int source, int destination, int cls)
 		{
 			string nm = SIGNAL_NET_ROUTING + "_" + std::to_string(source) + "_" + std::to_string(destination);
 			std::unordered_map<string,std::list<std::shared_ptr<observer>>>::iterator fnd = observable_events.find(nm);
@@ -166,16 +131,15 @@ class des::network : public des::observable
 				throw invalid_argument("Measurable event " + nm + " is not defined in network " + get_sid());
 			}
 		}
-		/**
-		 * @brief Get the number of event routed from source towards destination
-		 * 
-		 * @param source index of the source
-		 * @param index of the destintion
-		 * @param cls class of events 
-		 * 
-		 * @return int 
-		 */
-		inline int get_count(int source, int destination, int cls)
+			/**
+			 * @brief Return the current-run event count for an edge and class.
+			 *
+			 * @param source Source node index.
+			 * @param destination Destination node index.
+			 * @param cls Event class index.
+			 * @return Number of events routed on the edge in the current run.
+			 */
+			inline int get_count(int source, int destination, int cls)
 		{
 			string nm = SIGNAL_NET_ROUTING + "_" + std::to_string(source) + "_" + std::to_string(destination);
 			std::unordered_map<string,std::list<std::shared_ptr<observer>>>::iterator fnd = observable_events.find(nm);
@@ -190,16 +154,17 @@ class des::network : public des::observable
 				throw invalid_argument("Measurable event " + nm + " is not defined in network " + get_sid());
 			}
 		}
-		/**
-		 * @brief Get the flow routed from source towards destination
-		 * 
-		 * @param source index of the source
-		 * @param index of the destintion
-		 * @param cls class of events 
-		 * 
-		 * @return double 
-		 */
-		inline double get_flow(int source, int destination, int cls)
+			/**
+			 * @brief Return the cross-run mean flow for an edge and class.
+			 *
+			 * This reads the completed-run means stored by the edge flow observer.
+			 *
+			 * @param source Source node index.
+			 * @param destination Destination node index.
+			 * @param cls Event class index.
+			 * @return Mean flow over completed runs, or zero if no runs are stored.
+			 */
+			inline double get_flow(int source, int destination, int cls)
 		{
 			string nm = SIGNAL_NET_ROUTING + "_" + std::to_string(source) + "_" + std::to_string(destination);
 			std::unordered_map<string,std::list<std::shared_ptr<observer>>>::iterator fnd = observable_events.find(nm);
@@ -214,10 +179,16 @@ class des::network : public des::observable
 				throw invalid_argument("Measurable event " + nm + " is not defined in network " + get_sid());
 			}
 		}
-		/**
-		 * @brief Get the nth observer attached to a signal (0-based index).
-		 */
-		inline shared_ptr<observer> get_observer(const string& signal, unsigned int idx)
+			/**
+			 * @brief Return the observer at a signal-local index.
+			 *
+			 * @param signal Signal identifier, for example @c SIGNAL_NET_ROUTING + "_0_1".
+			 * @param idx Zero-based position in the signal's observer list.
+			 * @return Shared pointer to the requested observer.
+			 * @throws invalid_argument if @p signal is not registered.
+			 * @throws out_of_range if @p idx is not present for the signal.
+			 */
+			inline shared_ptr<observer> get_observer(const string& signal, unsigned int idx)
 		{
 			auto fnd = observable_events.find(signal);
 			if(fnd == observable_events.end())
@@ -230,16 +201,15 @@ class des::network : public des::observable
 			}
 			return *it;
 		}
-		/**
-		 * @brief Get the flow routed from source towards destination
-		 * 
-		 * @param source index of the source
-		 * @param index of the destintion
-		 * @param cls class of events 
-		 * 
-		 * @return double 
-		 */
-		inline double get_flow_stddev(int source, int destination, int cls)
+			/**
+			 * @brief Return the cross-run standard deviation of edge flow.
+			 *
+			 * @param source Source node index.
+			 * @param destination Destination node index.
+			 * @param cls Event class index.
+			 * @return Standard deviation of completed-run flow means.
+			 */
+			inline double get_flow_stddev(int source, int destination, int cls)
 		{
 			string nm = SIGNAL_NET_ROUTING + "_" + std::to_string(source) + "_" + std::to_string(destination);
 			std::unordered_map<string,std::list<std::shared_ptr<observer>>>::iterator fnd = observable_events.find(nm);
@@ -254,16 +224,15 @@ class des::network : public des::observable
 				throw invalid_argument("Measurable event " + nm + " is not defined in network " + get_sid());
 			}
 		}
-		/**
-		 * @brief Get the number of event routed from source towards destination
-		 * 
-		 * @param source index of the source
-		 * @param index of the destintion
-		 * @param alpha the confidence level
-		 * 
-		 * @return vector<int> 
-		 */
-		inline vector<pair<double,double>> get_count_ci(int source, int destination, double alpha)
+			/**
+			 * @brief Return count confidence intervals for every class on an edge.
+			 *
+			 * @param source Source node index.
+			 * @param destination Destination node index.
+			 * @param alpha Significance level used by the observer CI calculation.
+			 * @return One confidence interval per event class.
+			 */
+			inline vector<pair<double,double>> get_count_ci(int source, int destination, double alpha)
 		{
 			string nm = SIGNAL_NET_ROUTING + "_" + std::to_string(source) + "_" + std::to_string(destination);
 			std::unordered_map<string,std::list<std::shared_ptr<observer>>>::iterator fnd = observable_events.find(nm);
@@ -278,16 +247,15 @@ class des::network : public des::observable
 				throw invalid_argument("Measurable event " + nm + " is not defined in network " + get_sid());
 			}
 		}
-		/**
-		 * @brief Get the number of event routed from source towards destination
-		 * 
-		 * @param source index of the source
-		 * @param index of the destintion
-		 * @param alpha the confidence level
-		 * 
-		 * @return vector<int> 
-		 */
-		inline vector<pair<double,double>> get_flow_ci(int source, int destination, double alpha)
+			/**
+			 * @brief Return flow confidence intervals for every class on an edge.
+			 *
+			 * @param source Source node index.
+			 * @param destination Destination node index.
+			 * @param alpha Significance level used by the observer CI calculation.
+			 * @return One confidence interval per event class.
+			 */
+			inline vector<pair<double,double>> get_flow_ci(int source, int destination, double alpha)
 		{
 			string nm = SIGNAL_NET_ROUTING + "_" + std::to_string(source) + "_" + std::to_string(destination);
 			std::unordered_map<string,std::list<std::shared_ptr<observer>>>::iterator fnd = observable_events.find(nm);
@@ -302,17 +270,16 @@ class des::network : public des::observable
 				throw invalid_argument("Measurable event " + nm + " is not defined in network " + get_sid());
 			}
 		}
-		/**
-		 * @brief Get the number of event routed from source towards destination
-		 * 
-		 * @param source index of the source
-		 * @param index of the destintion
-		 * @param alpha the confidence level
-		 * @param cls class of events 
-		 * 
-		 * @return vector<int> 
-		 */
-		inline pair<double,double> get_count_ci(int source, int destination, int cls, double alpha)
+			/**
+			 * @brief Return the count confidence interval for one edge and class.
+			 *
+			 * @param source Source node index.
+			 * @param destination Destination node index.
+			 * @param cls Event class index.
+			 * @param alpha Significance level used by the observer CI calculation.
+			 * @return Confidence interval for the completed-run counts.
+			 */
+			inline pair<double,double> get_count_ci(int source, int destination, int cls, double alpha)
 		{
 			string nm = SIGNAL_NET_ROUTING + "_" + std::to_string(source) + "_" + std::to_string(destination);
 			std::unordered_map<string,std::list<std::shared_ptr<observer>>>::iterator fnd = observable_events.find(nm);
@@ -327,16 +294,16 @@ class des::network : public des::observable
 				throw invalid_argument("Measurable event " + nm + " is not defined in network " + get_sid());
 			}
 		}
-		/**
-		 * @brief Get the number of event routed from source towards destination
-		 * 
-		 * @param source index of the source
-		 * @param index of the destintion
-		 * @param alpha the confidence level
-		 * 
-		 * @return vector<int> 
-		 */
-		inline pair<double,double> get_flow_ci(int source, int destination, int cls, double alpha)
+			/**
+			 * @brief Return the flow confidence interval for one edge and class.
+			 *
+			 * @param source Source node index.
+			 * @param destination Destination node index.
+			 * @param cls Event class index.
+			 * @param alpha Significance level used by the observer CI calculation.
+			 * @return Confidence interval for the completed-run flow estimates.
+			 */
+			inline pair<double,double> get_flow_ci(int source, int destination, int cls, double alpha)
 		{
 			string nm = SIGNAL_NET_ROUTING + "_" + std::to_string(source) + "_" + std::to_string(destination);
 			std::unordered_map<string,std::list<std::shared_ptr<observer>>>::iterator fnd = observable_events.find(nm);
@@ -351,26 +318,27 @@ class des::network : public des::observable
 				throw invalid_argument("Measurable event " + nm + " is not defined in network " + get_sid());
 			}
 		}
-		/** s
-		 * @brief 
-		 * 
-		 * @return string 
-		 */
-		string to_string() const;
-		/**
-		 * @brief resets the state of the Network
-		 * 
-		 * @param time amount of time to remove from the current state in order to reset the Network consistently
-		 * 
-		 */
-		void reset(double time, vector<string> keys = vector<string>(), bool newrun = false);
-		/**
-		 * @brief notify a message to an observer
-		 * 
-		 * @param signal 
-		 * @param msg 
-		 */
-		inline void notify(string signal, message& msg) override
+			/**
+			 * @brief Serialize the network routing table to a human-readable string.
+			 *
+			 * @return Text representation of the routing tensor.
+			 */
+			string to_string() const;
+			/**
+			 * @brief Reset all network observers and node state.
+			 *
+			 * @param time Amount of elapsed time to subtract from scheduled event times.
+			 * @param keys Additional event-info keys whose stored times should be shifted.
+			 * @param newrun When true, observers snapshot the current run before clearing.
+			 */
+			void reset(double time, vector<string> keys = vector<string>(), bool newrun = false);
+			/**
+			 * @brief Notify all observers attached to a network-level signal.
+			 *
+			 * @param signal Signal identifier.
+			 * @param msg Message payload delivered to every attached observer.
+			 */
+			inline void notify(string signal, message& msg) override
 		{
 			unordered_map<string, list<shared_ptr<observer>>>::iterator it = observable_events.find(signal);
 			if(it != observable_events.end())
@@ -381,96 +349,94 @@ class des::network : public des::observable
 				}
 			}
 		}
-	protected:
-		/**
-		 * @brief Vector with all the des::node in the des::network
-		 * 
-		 */
-        vector<shared_ptr<node>> nodes;
-		/**
-		 * @brief Tensor describing the routing. For each destination and each event class hosts a double value.
-		 * In the hffunc function provided by default, those values are assumed to be the routing probabilities to choose a given destination form the current source.
-		 * routing.at(i) is the matrix that describes the routng probability to reach all the nodes inthe network for all the event classes.
-		 * routing.at(i).at(j) is the vector describing the routing probability for all the event classes to reach node j leaving from node i
-		 * routing.at(i).at().at(k) is the routing proability for an event of class k to get to node  leaving from node i 		 
-		 *  
-		 */
-        vector<vector<vector<double>>> routing;
-		/**
-		 * @brief const_handler unordered_multimap mapping the des::node's index and the des::Constraint::cons_key to the des::event::cls and the function pointer used to handle the des::Constraint
-		 * The function does not return a boolean, if true the Constraint is removed, The parameters are:
-		 * * event*: pointer to the des::event associated with the des::Constraint
-		 * * Constraint*: reference to des::Constraint expressing the constraint to the event
-		 * * const vector<node>&: reference to des::network::nodes
-		 * 
-		 */
-		/**
-		 * @brief The inner vector holds the Constraint for a given node an service class   
-		 * 
-		 */
-		// vector<vector<vector<pair<shared_ptr<Constraint>, function<bool(event*, const vector<shared_ptr<node>>&)>>>>> handler;
-		/**
-		 * @brief Handle events' constarint, both the time dependent and non-time dependent ones
-		 * 
-		 * @param e
-		 * @param time 
-		 */
-		// void handle_constraints(shared_ptr<event> e, const double& time);
-		
-		bool insert(shared_ptr<event> e, string node);
+		protected:
+			/**
+			 * @brief Nodes that participate in the network.
+			 *
+			 * The vector index is the node identifier used by the routing tensor.
+			 */
+	        vector<shared_ptr<node>> nodes;
+			/**
+			 * @brief Routing probabilities indexed as routing[source][destination][class].
+			 *
+			 * The default routing handler treats each source row as a cumulative
+			 * probability input: for a departing event of class k from node i,
+			 * routing[i][j][k] is the probability mass assigned to destination j.
+			 */
+	        vector<vector<vector<double>>> routing;
+			// Placeholder for per-node, per-class constraint handlers.
+			// vector<vector<vector<pair<shared_ptr<Constraint>, function<bool(event*, const vector<shared_ptr<node>>&)>>>>> handler;
+			// Placeholder for applying time-dependent and state-dependent constraints.
+			// void handle_constraints(shared_ptr<event> e, const double& time);
+			/**
+			 * @brief Insert an event into the node identified by string id.
+			 *
+			 * @param e Event to insert.
+			 * @param node Destination node string identifier.
+			 * @return true when the node is found and accepts the event.
+			 */
+			bool insert(shared_ptr<event> e, string node);
 
-		virtual pair<bool, int> hbfunc(shared_ptr<event>, int, const vector<vector<vector<double>>>&, shared_ptr<mt19937_64>& g);
-		virtual int hffunc(shared_ptr<event>, const vector<vector<vector<double>>> &, shared_ptr<mt19937_64>& g);
-	private:
-		/**
-		 * #####################
-		 * ## Class variables ##
-		 * #####################
-		**/
-		/**
-		 * @brief Reference to the simulator-wide mt1997_64 generator
-		 * 
-		 */
-        shared_ptr<mt19937_64> gen;
-		/**
-		 * @brief accounts for movements between stations. The mapping correspponds to the one provided with routing failure
-		 * 
-		 */
-        // vector<vector<vector<int>>> count_constrained_events;
-		/**
-		 * @brief Handle blocking events
-		 * 
-		 * @param e
-		 * @param time
-		 * @param routing 
-		 */
-		pair<bool, int> (*handle_block)(shared_ptr<event>, int, const vector<vector<vector<double>>>&, shared_ptr<mt19937_64>& g);
-		/**
-		 * @brief Handle blocking events
-		 * 
-		 * @param e
-		 * @param time
-		 * @param routing 
-		 */
-		int (*handle_forks)(shared_ptr<event>, const vector<vector<vector<double>>>&, shared_ptr<mt19937_64>&);
-		/**
-		 * @brief Min-heap index: {next_event_time, node_index}, kept in sync after every
-		 *        departure and arrival so that next_event() is O(log N) instead of O(N).
-		 */
-		set<pair<double, int>> event_heap;
-		/**
-		 * @brief Stores the time currently registered in event_heap for each node,
-		 *        needed to erase the old entry before re-inserting the updated one.
-		 */
-		vector<double> node_heap_time;
-		/**
-		 * @brief Re-synchronises event_heap for node idx after its next_event_time has changed.
-		 */
-		void update_heap(int idx);
-		/**
-		 * @brief Initialises event_heap and node_heap_time from the current node state.
-		 */
-		void init_heap();
-};
+			/**
+			 * @brief Default blocking handler.
+			 *
+			 * @return Pair whose first value tells whether rerouting should be attempted
+			 *         and whose second value is the reroute destination.
+			 */
+			virtual pair<bool, int> hbfunc(shared_ptr<event>, int, const vector<vector<vector<double>>>&, shared_ptr<mt19937_64>& g);
+			/**
+			 * @brief Default routing handler.
+			 *
+			 * Samples the routing tensor for the event's current node and class.
+			 *
+			 * @return Destination node index, or -1 when the event leaves the network.
+			 */
+			virtual int hffunc(shared_ptr<event>, const vector<vector<vector<double>>> &, shared_ptr<mt19937_64>& g);
+		private:
+			/**
+			 * @brief Shared simulator-wide pseudo-random generator.
+			 */
+	        shared_ptr<mt19937_64> gen;
+			// Placeholder for rejected or constrained movement counts.
+	        // vector<vector<vector<int>>> count_constrained_events;
+			/**
+			 * @brief Optional function used when a destination node rejects an event.
+			 */
+			pair<bool, int> (*handle_block)(shared_ptr<event>, int, const vector<vector<vector<double>>>&, shared_ptr<mt19937_64>& g);
+			/**
+			 * @brief Optional function used to choose the next destination for an event.
+			 */
+			int (*handle_forks)(shared_ptr<event>, const vector<vector<vector<double>>>&, shared_ptr<mt19937_64>&);
+			/**
+			 * @brief Min-heap index of pending departures as {next_event_time, node_index}.
+			 *
+			 * Entries are present only for nodes with a finite pending event time.
+			 */
+			set<pair<double, int>> event_heap;
+			/**
+			 * @brief Heap time currently registered for each node.
+			 *
+			 * A node with no pending event stores @c __DBL_MAX__. The value is used
+			 * to erase stale heap entries before re-inserting an updated one.
+			 */
+			vector<double> node_heap_time;
+			/**
+			 * @brief Resynchronize @c event_heap after a node's next-event time changes.
+			 *
+			 * @param idx Node index to update.
+			 */
+			void update_heap(int idx);
+			/**
+			 * @brief Return true when a next-event time represents a scheduled event.
+			 */
+			static inline bool has_pending_event(double time)
+			{
+				return time < __DBL_MAX__;
+			}
+			/**
+			 * @brief Rebuild @c event_heap and @c node_heap_time from current node state.
+			 */
+			void init_heap();
+	};
 
 #endif

@@ -97,25 +97,31 @@ namespace des
 
 	shared_ptr<event> network::next_event()
 	{
-		if(event_heap.empty()) return nullptr;
+		if(event_heap.empty())
+		{
+			init_heap();
+			if(event_heap.empty()) return nullptr;
+		}
 		auto it = event_heap.begin();
 		int idx = it->second;
 		event_heap.erase(it);
 		node_heap_time[idx] = __DBL_MAX__;
 		shared_ptr<event> e = nodes.at(idx)->departure();
-		node_heap_time[idx] = nodes.at(idx)->next_event_time();
-		event_heap.emplace(node_heap_time[idx], idx);
+		update_heap(idx);
 		return e;
 	}
 
 	void network::init_heap()
 	{
 		event_heap.clear();
-		node_heap_time.resize(nodes.size());
+		node_heap_time.assign(nodes.size(), __DBL_MAX__);
 		for(unsigned int i = 0; i < nodes.size(); i++)
 		{
 			node_heap_time[i] = nodes.at(i)->next_event_time();
-			event_heap.emplace(node_heap_time[i], i);
+			if(has_pending_event(node_heap_time[i]))
+			{
+				event_heap.emplace(node_heap_time[i], i);
+			}
 		}
 	}
 
@@ -123,7 +129,10 @@ namespace des
 	{
 		event_heap.erase({node_heap_time[idx], idx});
 		node_heap_time[idx] = nodes.at(idx)->next_event_time();
-		event_heap.emplace(node_heap_time[idx], idx);
+		if(has_pending_event(node_heap_time[idx]))
+		{
+			event_heap.emplace(node_heap_time[idx], idx);
+		}
 	}
 
 	pair<bool, int> network::hbfunc(shared_ptr<event>, int destination, const vector<vector<vector<double>>>& route, shared_ptr<mt19937_64>& g)
