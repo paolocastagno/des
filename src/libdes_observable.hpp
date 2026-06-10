@@ -19,15 +19,20 @@ namespace des
 class des::observable
 {
 	public:
-		/**
-		 * @brief Construct a new observable object
-		 * 
-		 */
-		observable(){};
-		/**
-		 * @brief Destroy the observable object
-		 * 
-		 */
+			/**
+			 * @brief Construct an observable with no string identifier.
+			 *
+			 * Derived classes are expected to populate @c observable_events with the
+			 * signals they support before clients call attach(). The observer count is
+			 * initialized to zero so attach()/detach() can maintain it consistently.
+			 */
+			observable() : sid(), observers(0) {};
+			/**
+			 * @brief Destroy the observable object.
+			 *
+			 * All attached observers are detached before destruction so their attached
+			 * flags do not continue to point conceptually at a dead observable.
+			 */
 		~observable()
 		{
 			if(observers != 0)
@@ -35,18 +40,23 @@ class des::observable
 				detach();
 			}
 		}
-		/**
-		 * @brief Construct a new observable object
-		 * 
-		 * @param id 
-		 */
-		observable(string id) : sid(id){}
-		/**
-		 * @brief attach an observer to a given event
-		 * 
-		 * @param event the string identifier of the signal
-		 * @param obs a reference to the observer
-		 */
+			/**
+			 * @brief Construct an observable with a string identifier.
+			 *
+			 * @param id Human-readable identifier used in diagnostics and error messages.
+			 */
+			observable(string id) : sid(id), observers(0){}
+			/**
+			 * @brief Attach an observer to a registered signal.
+			 *
+			 * The observable keeps a shared reference to @p obs in the list associated
+			 * with @p event. The signal must already exist in @c observable_events;
+			 * derived classes usually create those entries in their constructors.
+			 *
+			 * @param event String identifier of the signal to observe.
+			 * @param obs Observer instance that will receive notifications.
+			 * @throws invalid_argument if @p event is not registered by this observable.
+			 */
 		inline void attach(string event, shared_ptr<observer> obs)
         {
 			unordered_map<string, list<shared_ptr<observer>>>::iterator it = observable_events.find(event);
@@ -61,11 +71,12 @@ class des::observable
 				throw invalid_argument("Measurable event " + obs -> get_event() + " is not defined in network " + get_sid());
 			}
         }
-		/**
-		 * @brief detach all measures from the current entity
-		 * 
-		 * @param description the string identifier of the measure
-		 */
+			/**
+			 * @brief Detach every observer from every registered signal.
+			 *
+			 * Each observer's attached flag is cleared as it is removed, and the total
+			 * observer count is decremented for every detached observer.
+			 */
         inline void detach()
         {
 			for(unordered_map<string, list<shared_ptr<observer>>>::iterator it = observable_events.begin(); it != observable_events.end(); it++)
@@ -79,11 +90,15 @@ class des::observable
 				}
 			}
         }
-		/**
-		 * @brief detach a measure from the current entity
-		 * 
-		 * @param description the string identifier of the measure
-		 */
+			/**
+			 * @brief Detach one observer from a signal by observer identifier.
+			 *
+			 * If the signal or observer identifier is not found, the method leaves the
+			 * observable unchanged.
+			 *
+			 * @param measure Observer identifier, as returned by observer::get_observer().
+			 * @param event Signal identifier from which the observer should be removed.
+			 */
         inline void detach(string measure, string event)
         {
 			unordered_map<string, list<shared_ptr<observer>>>::iterator it = observable_events.find(event);
@@ -101,41 +116,49 @@ class des::observable
 				}
 			}
         }
-		/**
-         * @brief notify all attached observers
-         * 
-		 * @param signal the string identifier of the signal
-         */
-        virtual void notify(string signal, message& message) = 0;
-		/**
-		 * @brief Get the sid object
-		 * 
-		 * @return string 
-		 */
+			/**
+	         * @brief Notify all observers attached to a signal.
+	         *
+	         * Concrete observables decide how to deliver @p message to the observers
+	         * associated with @p signal.
+	         *
+			 * @param signal String identifier of the signal being emitted.
+			 * @param message Payload delivered to observers.
+	         */
+	        virtual void notify(string signal, message& message) = 0;
+			/**
+			 * @brief Return the observable string identifier.
+			 *
+			 * @return Human-readable identifier for diagnostics and reporting.
+			 */
 		inline string get_sid() const
 		{
 			return sid;
 		}
-		/**
-		 * @brief Set the sid object
-		 * 
-		 * @param stringid 
-		 */
+			/**
+			 * @brief Set the observable string identifier.
+			 *
+			 * @param stringid Human-readable identifier for diagnostics and reporting.
+			 */
 		inline void set_sid(string stringid)
 		{
 			sid = stringid;
 		}
 	protected:
 		string sid;
-		/**
-		 * @brief keeps the information about attached observers
-		 * 
-		 */
-		int observers;
-		/**
-		 * @brief Holds all the vector observers
-		 * 
-		 */
+			/**
+			 * @brief Total number of observer registrations across all signals.
+			 *
+			 * The same observer attached to multiple signals contributes one count per
+			 * registration.
+			 */
+			int observers;
+			/**
+			 * @brief Registered signals and their attached observer lists.
+			 *
+			 * Keys are signal identifiers. Values are ordered lists of observers that
+			 * should be notified when the corresponding signal is emitted.
+			 */
         unordered_map<string, list<shared_ptr<observer>>> observable_events;
 };
 #endif
