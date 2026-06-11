@@ -21,18 +21,29 @@ namespace des
 	class histogram;
 }
 
+/**
+ * @brief Observer that groups numeric samples into fixed-width bins.
+ *
+ * A histogram keeps one current-run bucket vector per event class. Incoming
+ * values are quantized to @c floor(value / bin_size) * bin_size; summary
+ * statistics are therefore computed over the binned values, not the raw input
+ * values. Calling reset(true), reset(cls, true), or end_run() snapshots the
+ * current buckets into @c s_runs so confidence intervals can be computed across
+ * completed replications.
+ */
 class des::histogram : public des::observer {
     public:
         typedef struct bin
         {
             /**
-             * @brief Bin's upper bound
-             * 
+             * @brief Binned value used as the bucket key.
+             *
+             * Values are produced by @c floor(sample / bin_size) * bin_size,
+             * so this is the lower edge of the bucket for positive samples.
              */
             double value;
             /**
-             * @brief Number of objects belonging to the bin
-             * 
+             * @brief Number of samples assigned to this bucket.
              */
             unsigned int count;
             /**
@@ -41,24 +52,24 @@ class des::histogram : public des::observer {
              */
             bin() : value(0), count(0) {}
             /**
-             * @brief Construct a new bin object
-             * 
-             * @param v 
+             * @brief Construct a bin for bucket value @p v with zero count.
+             *
+             * @param v Binned value used as the bucket key.
              */
             bin(double v) : value(v), count(0)
             {}
             /**
-             * @brief Construct a new bin object
-             * 
-             * @param v 
-             * @param c 
+             * @brief Construct a bin for bucket value @p v with count @p c.
+             *
+             * @param v Binned value used as the bucket key.
+             * @param c Initial sample count for the bucket.
              */
             bin(double v, int c) : value(v), count(c)
             {}
             /**
-             * @brief Construct a new bin object
-             * 
-             * @param b 
+             * @brief Copy-construct a bin from another bin.
+             *
+             * @param b Source bin.
              */
             bin(const bin& b)
             {
@@ -66,10 +77,10 @@ class des::histogram : public des::observer {
                 count = b.count;
             }
             /**
-             * @brief Overload of copy assignment
-             * 
-             * @param other 
-             * @return bin 
+             * @brief Copy another bin's bucket value and count into this bin.
+             *
+             * @param other Source bin.
+             * @return Reference to this bin.
              */
             bin& operator==(bin& other)
             {
@@ -86,21 +97,19 @@ class des::histogram : public des::observer {
                 return *this;
             }
             /**
-             * @brief Define the equals operator
-             * 
-             * @param lhs 
-             * @param rhs 
-             * @return true 
-             * @return false 
+             * @brief Compare bins by bucket value.
+             *
+             * @param b Bin to compare against.
+             * @return @c true when both bins represent the same bucket value.
              */
             inline bool operator==(bin b)
             {
                 return value == b.value;
             }
             /**
-             * @brief Define prefix increment operator
-             * 
-             * @return bin& 
+             * @brief Increase the bucket sample count.
+             *
+             * @return Reference to this bin after incrementing.
              */
             inline bin& operator++()
             {
@@ -108,9 +117,9 @@ class des::histogram : public des::observer {
                 return *this;
             }
             /**
-             * @brief Define postfix increment operator
-             * 
-             * @return bin 
+             * @brief Increase the bucket sample count.
+             *
+             * @return Copy of the bin before incrementing.
              */
             inline bin operator++(int)
             {
@@ -119,9 +128,9 @@ class des::histogram : public des::observer {
                 return old;
             }
             /**
-             * @brief Define prefix decrement operator
-             * 
-             * @return bin& 
+             * @brief Decrease the bucket sample count.
+             *
+             * @return Reference to this bin after decrementing.
              */
             inline bin& operator--()
             {
@@ -129,10 +138,10 @@ class des::histogram : public des::observer {
                 return *this;
             }
             /**
-             * @brief Define greater then operator
-             * 
-             * @param b 
-             * @return int 
+             * @brief Order bins by bucket value.
+             *
+             * @param b Bin to compare against.
+             * @return @c true when this bucket value is greater than @p b.
              */
             inline bool operator> (const bin& b) const 
             {
@@ -143,11 +152,10 @@ class des::histogram : public des::observer {
                 return false;
             }
             /**
-             * @brief Define less than operator
-             * 
-             * @param b 
-             * @return true 
-             * @return false 
+             * @brief Order bins by bucket value.
+             *
+             * @param b Bin to compare against.
+             * @return @c true when this bucket value is less than @p b.
              */
             inline bool operator< (const bin& b) const
             {
@@ -160,9 +168,11 @@ class des::histogram : public des::observer {
         } bin;
 
         /**
-         * @brief Construct a new histogram object
-         * 
-         * @param description String identifier of the observer
+         * @brief Construct a histogram observer.
+         *
+         * @param description String identifier of the observer and incoming
+         *                    message key to read.
+         * @param cls Number of event classes to track independently.
          */
         histogram(const string& description, int cls) : observer() // description, id_gen++){}
         {
@@ -178,22 +188,30 @@ class des::histogram : public des::observer {
             s_runs = std::vector<std::vector<std::vector<histogram::bin>>>(cls, std::vector<std::vector<histogram::bin>>());
         }
         /**
-         * @brief Construct a new histogram object
-         * 
-         * @param description observer's string identifier
-         * @param evnt observable's event string identifier 
+         * @brief Construct a histogram observer already associated with an event.
+         *
+         * @param description String identifier of the observer and incoming
+         *                    message key to read.
+         * @param evnt Observable event string identifier.
+         * @param cls Number of event classes to track independently.
          */
         histogram(const string& description, const string& evnt, int cls) : histogram(description, cls)
         {
             event = evnt;
         }
         /**
-         * @brief Updates the histogram value
-         * 
+         * @brief Add one sample to the histogram for class @p cls.
+         *
+         * The raw sample is quantized to the configured bucket size before it
+         * is counted. Running mean and standard deviation use that binned value.
+         *
+         * @param value Raw observed value.
+         * @param cls Event-class index.
          */
         inline void update(double value, int cls){
             int rounded_value = static_cast<int>(floor(value/bin_size));
-            std::vector<histogram::bin>::iterator fnd = std::find(v.at(cls).begin(), v.at(cls).end(), rounded_value*bin_size);
+            const double binned_value = static_cast<double>(rounded_value)*bin_size;
+            std::vector<histogram::bin>::iterator fnd = std::find(v.at(cls).begin(), v.at(cls).end(), binned_value);
             if(fnd != v.at(cls).end())
             {
                 ++(*fnd);
@@ -208,23 +226,27 @@ class des::histogram : public des::observer {
                 }
                 ++(v.at(cls).at(current-1));
             }
-            sum.at(cls) += rounded_value;
+            sum.at(cls) += binned_value;
             ++(elements.at(cls));
         }
         /**
-         * @brief Updates the histogram value
-         * 
+         * @brief Update from a serialized observer message.
+         *
+         * Reads the sample value from the key named by @c observer_id and the
+         * class index from @c EVENT_CLS.
+         *
+         * @param m Serialized @c des::message.
          */
         inline void update(string m) override{
             message msg(m);
             update(msg.get_value(observer_id), msg.get_value(EVENT_CLS));
         }
         /**
-         * @brief Set the binsize
-         * 
-         * @param bs 
-         * @return true if all the histograms are empty, and the binsisze has been changed 
-         * @return false otherwise
+         * @brief Set the bin width while no current-run buckets exist.
+         *
+         * @param bs New bin width.
+         * @return @c true if every current-run histogram is empty and the bin
+         *         size was changed; @c false otherwise.
          */
         bool set_binsize(double bs)
         {
@@ -239,116 +261,117 @@ class des::histogram : public des::observer {
             return all_empty;
         }
         /**
-         * @brief Computes the mean for a class
-         * 
-         * @param cls 
-         * @return double 
+         * @brief Current-run mean of binned values for class @p cls.
+         *
+         * @param cls Event-class index.
+         * @return Mean binned value for the current run.
          */
         inline double mean(int cls)
         {
             return sum.at(cls) / static_cast<double>(elements.at(cls));
         }
         /**
-         * @brief Returns the number of observations
-         * 
-         * @param cls 
-         * @return double 
+         * @brief Number of samples observed in the current run for class @p cls.
+         *
+         * @param cls Event-class index.
+         * @return Current-run sample count.
          */
         inline unsigned int observations(int cls)
         {
-            return v.at(cls).size();
+            return elements.at(cls);
         }
         /**
-         * @brief Computes the Standard deviation for a class
-         * 
-         * @param cls 
-         * @return double 
+         * @brief Population standard deviation of current-run binned values.
+         *
+         * Returns @c __DBL_MAX__ when fewer than two samples have been observed.
+         *
+         * @param cls Event-class index.
+         * @return Population standard deviation of binned values.
          */
         inline double stddev(int cls) const
         {
             double sdev = __DBL_MAX__;
-            if(v.at(cls).size() >= 2)
+            if(elements.at(cls) >= 2)
             {
                 sdev = 0;
-                double mean = sum.at(cls) / static_cast<double>(elements.at(cls));
+                double m = sum.at(cls) / static_cast<double>(elements.at(cls));
                 for(unsigned int j = 0; j < v.at(cls).size(); j++)
                 {
-                    sdev += pow(mean-v.at(cls).at(j).value,2)*v.at(cls).at(j).count;
+                    sdev += pow(m-v.at(cls).at(j).value,2)*v.at(cls).at(j).count;
                 }
                 sdev = sqrt(sdev / static_cast<double>(elements.at(cls)));
             }
             return sdev;
         }
         /**
-         * @brief Resets the histogram for the given class and value
-         * 
-         * @param value 
-         * @param cls 
+         * @brief Reset one class, optionally storing it as a completed run.
+         *
+         * @param cls Event-class index to reset.
+         * @param newrun When @c true, store the current class histogram in the
+         *               completed-run store before clearing it.
          */
         inline void reset(int cls, bool newrun) override
         {
-            sum.at(cls) = 0;
-            elements.at(cls);
-            v.at(cls).clear();
+            if(newrun)
+            {
+                store_current_class(cls);
+                return;
+            }
+            reset_current_class(cls);
         }
         /**
-         * @brief 
-         * 
-         * @param value 
+         * @brief Reset all classes, optionally storing them as a completed run.
+         *
+         * @param newrun When @c true, store every current class histogram in the
+         *               completed-run store before clearing them.
          */
         inline void reset(bool newrun) override
         {
             if(newrun)
             {
                 end_run();
+                return;
             }
-            for(int i = 0; i < v.size(); i++)
-            {
-                reset(i, newrun);
-            }
+            reset_current();
         }
         /**
-         * @brief 
-         * 
-         * @param value 
+         * @brief Reset all classes, optionally storing rate-normalized buckets.
+         *
+         * When @p newrun is @c true, bucket values are divided by @p time before
+         * the histograms are stored as a completed run.
+         *
+         * @param time Sampling interval used to normalize bucket values.
+         * @param newrun When @c true, store a normalized completed run.
          */
         inline void reset(double time, bool newrun)
         {
             if(newrun)
             {
                 end_run(time);
+                return;
             }
-            for(int i = 0; i < v.size(); i++)
-            {
-                reset(i, newrun);
-            }
+            reset_current();
         }
         /**
-         * @brief removes all the elements from the structure
-         * 
+         * @brief Clear current-run buckets and counters without storing a run.
          */
         inline void clear() override
         {
-            for(unsigned int i = 0; i < v.size(); i++)
-            {
-                sum.at(i) = 0;
-                elements.at(i);
-                v.at(i).clear();
-            }
+            reset_current();
         }
         /**
-         * @brief returns the current value of the histogram
-         * 
-         * @return double 
+         * @brief Current-run histograms for all classes.
+         *
+         * @return Vector indexed by class, then by bucket.
          */
         inline std::vector<std::vector<bin>> get()
         {
             return v;
         }
         /**
-         * @brief Writes the relevant information about the observer to string
-         * 
-         * @return string 
+         * @brief Format current-run summary statistics for logging.
+         *
+         * @return String containing the observer id and per-class summaries.
          */
         inline string to_string() const override{
             string str = "\t" + observer_id;
@@ -359,150 +382,45 @@ class des::histogram : public des::observer {
             return str;
         }
         /**
-         * @brief Store the current value of the scalar and reset its state
-         *  
+         * @brief Store all current histograms as one completed run and clear them.
          */
         inline void end_run()
         {
-            // Make all the stored histograms of the same lenght
-            if(run > 0)
+            for(unsigned int cls = 0; cls < v.size(); cls++)
             {
-                for(int cls = 0; cls < v.size(); cls++)
-                {
-                    //Find the max value stored in the previous runs
-                    int s_max = s_runs.at(cls).at(0).size();
-                    //Find the current max
-                    int max = v.at(cls).size();
-                    if(max > s_max)
-                    {
-                        // Add further elements in the stored histograms
-                        int missing = max-s_max;
-                        std::vector<histogram::bin> missing_bin(missing, histogram::bin(0,0));
-                        int base = s_runs.at(cls).at(0).size();
-                        for(int i = 0; i < missing; i++)
-                        {
-                            missing_bin.at(i).value = v.at(cls).at(base + i).value;
-                        }
-                        for(int i = 0; i < run; i++)
-                        {
-                            std::vector<histogram::bin> tmp;
-                            merge(s_runs.at(cls).at(i).begin(), s_runs.at(cls).at(i).end(), missing_bin.begin(), missing_bin.end(), std::back_inserter(tmp));
-                            s_runs.at(cls).at(i) = tmp;
-                        }
-                    }
-                    else
-                    {
-                        // Add further elements in the current histogram
-                        int missing = s_max-max;
-                        std::vector<histogram::bin> missing_bin(missing, histogram::bin(0,0));
-                        int base = v.at(cls).size();
-                        for(int i = 0; i < missing; i++)
-                        {
-                            missing_bin.at(i).value = s_runs.at(0).at(cls).at(base + i).value;
-                        }
-                        std::vector<histogram::bin> tmp;
-                        merge(v.at(cls).begin(), v.at(cls).end(), missing_bin.begin(), missing_bin.end(), std::back_inserter(tmp));
-                        v.at(cls) = tmp;
-                    }
-                }
-            }
-            // Store the histograms appropriately
-            for(int i = 0; i < v.size(); i++)
-            {
-                s_runs.at(i).push_back(v.at(i));
+                store_current_class(cls);
             }
             ++run;
         }
         /**
-         * @brief Store the current value of the scalar (as a rate) and reset its state
-         * 
-         * @param time sampling time interval duration
+         * @brief Store all current histograms after normalizing bucket values.
+         *
+         * @param time Sampling interval used to convert bucket values into rates.
          */
         inline void end_run(double time)
         {
-            // Make all the stored histograms of the same lenght
-            if(run > 0)
+            for(unsigned int cls = 0; cls < v.size(); cls++)
             {
-                for(int cls = 0; cls < v.size(); cls++)
+                for(unsigned int i = 0; i < v.at(cls).size(); i++)
                 {
-                    //Find min and max valued stored in the previous runs
-                    double s_min = s_runs.at(cls).at(0).at(0).value;
-                    double s_max = s_runs.at(cls).at(0).at(s_runs.at(cls).at(0).size()-1).value;
-                    //Find the current min and max
-                    double min = v.at(cls).at(0).value;
-                    double max = v.at(cls).at(v.at(cls).size()-1).value;
-                    if(min < s_min)
-                    {
-                        // Add further elements in the stored histograms
-                        int missing = static_cast<int>(ceil((s_min-min)/bin_size));
-                        std::vector<histogram::bin> missing_bin(missing, histogram::bin(0,0));
-                        for(int i = 0; i < missing; i++)
-                        {
-                            missing_bin.at(i).value = v.at(cls).at(i).value;
-                        }
-                        for(int i = 0; i < run; i++)
-                        {
-                            std::vector<histogram::bin> tmp = s_runs.at(cls).at(i);
-                            merge(missing_bin.begin(), missing_bin.end(), tmp.begin(), tmp.end(), std::back_inserter(s_runs.at(i).at(cls)));
-                        }
-                    }
-                    else if(min > s_min)
-                    {
-                        // Add further elements in the current histogram
-                        int missing = static_cast<int>(ceil((min-s_min)/bin_size));
-                        std::vector<histogram::bin> missing_bin(missing, histogram::bin(0,0));
-                        for(int i = 0; i < missing; i++)
-                        {
-                            missing_bin.at(i).value = s_runs.at(0).at(cls).at(i).value;
-                        }
-                        std::vector<histogram::bin> tmp = v.at(cls);
-                        merge(missing_bin.begin(), missing_bin.end(), tmp.begin(), tmp.end(), std::back_inserter(v.at(cls)));
-                    }
-                    else if(max > s_max)
-                    {
-                        // Add further elements in the stored histograms
-                        int missing = static_cast<int>(ceil((max-s_max)/bin_size));
-                        std::vector<histogram::bin> missing_bin(missing, histogram::bin(0,0));
-                        int base = s_runs.at(cls).at(0).size();
-                        for(int i = 0; i < missing; i++)
-                        {
-                            missing_bin.at(i).value = v.at(cls).at(base + i).value;
-                        }
-                        for(int i = 0; i < run; i++)
-                        {
-                            std::vector<histogram::bin> tmp = s_runs.at(i).at(cls);
-                            merge(tmp.begin(), tmp.end(),missing_bin.begin(), missing_bin.end(),  std::back_inserter(s_runs.at(i).at(cls)));
-                        }
-                    }
-                    else if(max < s_max)
-                    {
-                        // Add further elements in the current histogram
-                        int missing = static_cast<int>(ceil((s_min-min)/bin_size));
-                        std::vector<histogram::bin> missing_bin(missing, histogram::bin(0,0));
-                        int base = v.at(cls).size();
-                        for(int i = 0; i < missing; i++)
-                        {
-                            missing_bin.at(i).value = s_runs.at(0).at(cls).at(base + i).value;
-                        }
-                        std::vector<histogram::bin> tmp = v.at(cls);
-                        merge(tmp.begin(), tmp.end(), missing_bin.begin(), missing_bin.end(), std::back_inserter(v.at(cls)));
-                    }
+                    v.at(cls).at(i).value /= time;
                 }
-            }
-            // Store the histograms appropriately
-            for(int i = 0; i < v.size(); i++)
-            {
-                // Divide the values
-                for(int j = 0; j < v.at(i).size(); j++)
-                {
-                    v.at(i).at(j).value /= time;
-                }
-                s_runs.at(i).push_back(v.at(i));
+                store_current_class(cls);
             }
             ++run;
-            reset(0);
         }
 
+        /**
+         * @brief Confidence interval per bucket for a completed-run class.
+         *
+         * Each row contains bucket value, mean count, lower bound, and upper
+         * bound across completed runs.
+         *
+         * @param alpha Significance level.
+         * @param cls Event-class index.
+         * @return Rows of @c {bucket, mean, lower, upper}; empty if fewer than
+         *         two completed runs are available.
+         */
         inline std::vector<std::vector<double>> confidence_interval(double alpha, int cls)
         {
             if(s_runs.size() > 0 && s_runs.at(cls).size() > 1)
@@ -530,6 +448,12 @@ class des::histogram : public des::observer {
             }
         }
 
+        /**
+         * @brief Confidence intervals per bucket for every class.
+         *
+         * @param alpha Significance level.
+         * @return Outer vector indexed by class.
+         */
         inline std::vector<std::vector<std::vector<double>>> confidence_interval(double alpha)
         {
             std::vector<std::vector<std::vector<double>>> ci;
@@ -543,6 +467,15 @@ class des::histogram : public des::observer {
             return ci;
         }
 
+        /**
+         * @brief Render histogram data as CSV-style rows.
+         *
+         * If completed runs exist, prints bucket confidence-interval rows.
+         * Otherwise prints current-run bucket values and counts.
+         *
+         * @param alpha Significance level used for confidence intervals.
+         * @return CSV-style text representation.
+         */
         inline string print(double alpha = 1e-2)
         {
             std::stringstream stream;
@@ -583,20 +516,92 @@ class des::histogram : public des::observer {
 
     private:
         /**
-         * @brief measures' identifier generator
-         * 
+         * @brief Clear the current-run state for one class.
+         *
+         * Completed-run snapshots in @c s_runs are preserved.
          */
-        // inline static int id_gen = 0;
+        inline void reset_current_class(int cls)
+        {
+            sum.at(cls) = 0;
+            elements.at(cls) = 0;
+            v.at(cls).clear();
+        }
+
         /**
-         * @brief the histogram
-         * 
+         * @brief Clear current-run state for all classes.
+         *
+         * Completed-run snapshots in @c s_runs are preserved.
          */
-        std::vector<std::vector<histogram::bin>> v;
-        double bin_size;
-        std::vector<unsigned int> elements;
-        std::vector<double> sum;
-        int run;
-        std::vector<std::vector<std::vector<histogram::bin>>> s_runs;
+        inline void reset_current()
+        {
+            for(unsigned int i = 0; i < v.size(); i++)
+            {
+                reset_current_class(i);
+            }
+        }
+
+        /**
+         * @brief Snapshot one class into the completed-run store and clear it.
+         *
+         * Existing runs for the class are first aligned so every run has a row
+         * for the same bucket values.
+         */
+        inline void store_current_class(int cls)
+        {
+            align_run_bins(cls);
+            s_runs.at(cls).push_back(v.at(cls));
+            reset_current_class(cls);
+        }
+
+        /**
+         * @brief Add zero-count buckets to @p target for buckets in @p reference.
+         *
+         * This keeps completed runs comparable even when a bucket appears in one
+         * replication but not another.
+         */
+        inline void add_missing_bins(std::vector<histogram::bin>& target, const std::vector<histogram::bin>& reference)
+        {
+            std::vector<histogram::bin> missing_bins;
+            for(const histogram::bin& bin: reference)
+            {
+                if(std::find(target.begin(), target.end(), bin) == target.end())
+                {
+                    missing_bins.push_back(histogram::bin(bin.value, 0));
+                }
+            }
+            if(missing_bins.empty())
+            {
+                return;
+            }
+
+            std::vector<histogram::bin> merged;
+            merge(target.begin(), target.end(), missing_bins.begin(), missing_bins.end(), std::back_inserter(merged));
+            target = merged;
+        }
+
+        /**
+         * @brief Align current and completed histograms for one class by bucket value.
+         */
+        inline void align_run_bins(int cls)
+        {
+            std::vector<histogram::bin> reference = v.at(cls);
+            for(unsigned int i = 0; i < s_runs.at(cls).size(); i++)
+            {
+                add_missing_bins(reference, s_runs.at(cls).at(i));
+            }
+            for(unsigned int i = 0; i < s_runs.at(cls).size(); i++)
+            {
+                add_missing_bins(s_runs.at(cls).at(i), reference);
+            }
+            v.at(cls) = reference;
+        }
+
+        std::vector<std::vector<histogram::bin>> v;              ///< Current-run buckets, indexed by class.
+        double bin_size;                                         ///< Width used to quantize raw sample values.
+        std::vector<unsigned int> elements;                      ///< Current-run sample count, per class.
+        std::vector<double> sum;                                 ///< Sum of current-run binned values, per class.
+        int run;                                                 ///< Number of completed all-class runs.
+        std::vector<std::vector<std::vector<histogram::bin>>> s_runs; ///< Completed-run buckets, indexed by class then run.
 };
 
 #endif
