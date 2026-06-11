@@ -38,7 +38,7 @@ class des::sink : public des::sourcesink
 		 * @param description String identifier.
 		 * @param gen Unused pseudo-random generator.
 		 */
-		sink(std::vector<double> r, string description, mt19937_64& gen);
+		sink(vector<double> r, string description, mt19937_64& gen);
 		/**
 		 * @brief Construct a sink for a fixed number of event classes.
 		 *
@@ -63,7 +63,7 @@ class des::sink : public des::sourcesink
 		 *
 		 * @return Always 0.
 		 */
-		int schedule(shared_ptr<event>& e, std::vector<std::vector<int>> s_map) override;
+		int schedule(shared_ptr<event>& e, vector<vector<int>> s_map) override;
 		/**
 		 * @brief Select a waiting queue for a sink arrival.
 		 *
@@ -72,13 +72,13 @@ class des::sink : public des::sourcesink
 		 *
 		 * @return Always 0.
 		 */
-		int enqueue(shared_ptr<event>& e, std::vector<std::vector<int>> q_map) override;
+		int enqueue(shared_ptr<event>& e, vector<vector<int>> q_map) override;
 		/**
 		 * @brief Dispose the completed event into the shared event pool.
 		 *
 		 * @return Always 0.
 		 */
-		int dequeue(shared_ptr<event>& e, std::vector<std::vector<int>> s_map) override;
+		int dequeue(shared_ptr<event>& e, vector<vector<int>> s_map) override;
 		// Utility methods
 		/**
 		 * @brief Reset the sink and optionally snapshot attached observers.
@@ -117,12 +117,12 @@ class des::sink : public des::sourcesink
 		 * @param idx Server index; ignored.
 		 * @return Always 0.
 		 */
-		inline double get_service(unsigned int& cls, unsigned int& idx) override
+		inline double get_service(unsigned int&, unsigned int&) override
 		{
 			return 0;
 		}
 	private:
-        std::vector<double> rate; ///< Placeholder rate storage for compatibility.
-        std::vector<exponential_distribution<double>> exp; ///< Placeholder distributions for compatibility.
+        vector<double> rate; ///< Placeholder rate storage for compatibility.
+        vector<exponential_distribution<double>> exp; ///< Placeholder distributions for compatibility.
 };
 #endif

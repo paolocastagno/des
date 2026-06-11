@@ -75,7 +75,7 @@ class des::node : public des::object, public des::observable
 		 * @param descriptioin Description of the node
 		 * @param g The global mersenne twister random number generator used to generate events' service time
 		 */
-		node(unsigned int cls, vector<shared_ptr<queue>> q, vector<shared_ptr<queue>>, vector<vector<int>> qmap, vector<vector<int>> smap, string description, shared_ptr<mt19937_64> g);
+		node(unsigned int cls, vector<shared_ptr<queue>> q_vec, vector<shared_ptr<queue>> s_vec, vector<vector<int>> qmap, vector<vector<int>> smap, string description, shared_ptr<mt19937_64> g);
 		/**
 		 * @brief Construct a new node::node object. Each node object is characterized by one or more policy specifying how to handle events
 		 * 

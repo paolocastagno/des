@@ -14,7 +14,7 @@ namespace des
 	sink::~sink()
 	{}
 
-	int sink::schedule(shared_ptr<event>& e, vector<vector<int>> s_map)
+	int sink::schedule(shared_ptr<event>&, vector<vector<int>>)
 	{
 		// It does not matter the class of the incoming job, all jobs get cleared and
 		// disposed in the events list for future use.
@@ -23,14 +23,14 @@ namespace des
 		return 0;
 	}
 
-	int sink::enqueue(shared_ptr<event>& e, vector<vector<int>> q_map)
+	int sink::enqueue(shared_ptr<event>&, vector<vector<int>>)
 	{
 		// It does not matter the class of the incoming job, all jobs get cleared and
 		// disposed in the events list for future use
 		return 0;
 	}
 
-	int sink::dequeue(shared_ptr<event>& e, vector<vector<int>> q_map)
+	int sink::dequeue(shared_ptr<event>& e, vector<vector<int>>)
 	{
 		dispose_event(e);
 		return 0;

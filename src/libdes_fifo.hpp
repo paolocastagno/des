@@ -18,9 +18,9 @@ class des::fifo : public des::policy
 {
 	public:
 		fifo();
-		bool update(shared_ptr<event> e, list<shared_ptr<event>>& l, unsigned int positions, double rate);
-		bool update(shared_ptr<event> e, list<shared_ptr<event>>& l, unsigned int positions);
-		bool update(shared_ptr<event> e, list<shared_ptr<event>>& l, double rate);
-		bool front();
+		bool update(shared_ptr<event> e, list<shared_ptr<event>>& l, unsigned int positions, double rate) override;
+		bool update(shared_ptr<event> e, list<shared_ptr<event>>& l, unsigned int positions) override;
+		bool update(shared_ptr<event> e, list<shared_ptr<event>>& l, double rate) override;
+		bool front() override;
 };
 #endif

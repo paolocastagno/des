@@ -33,6 +33,8 @@ namespace des
  */
 class des::histogram : public des::observer {
     public:
+        using observer::update;
+
         typedef struct bin
         {
             /**
@@ -82,7 +84,7 @@ class des::histogram : public des::observer {
              * @param other Source bin.
              * @return Reference to this bin.
              */
-            bin& operator==(bin& other)
+            bin& operator=(const bin& other)
             {
                 // Guard self assignment
                 if (this == &other)
@@ -178,14 +180,15 @@ class des::histogram : public des::observer {
         {
             observer_id = description;
             bin_size = 1e-4;
-            for(unsigned int i = 0; i < cls; i++)
+            const auto class_count = static_cast<size_t>(cls);
+            for(size_t i = 0; i < class_count; i++)
             {
                 v.push_back({});
                 elements.push_back(0);
                 sum.push_back(0);
             }
             run = 0;
-            s_runs = std::vector<std::vector<std::vector<histogram::bin>>>(cls, std::vector<std::vector<histogram::bin>>());
+            s_runs = vector<vector<vector<histogram::bin>>>(class_count, vector<vector<histogram::bin>>());
         }
         /**
          * @brief Construct a histogram observer already associated with an event.
@@ -211,7 +214,7 @@ class des::histogram : public des::observer {
         inline void update(double value, int cls){
             int rounded_value = static_cast<int>(floor(value/bin_size));
             const double binned_value = static_cast<double>(rounded_value)*bin_size;
-            std::vector<histogram::bin>::iterator fnd = std::find(v.at(cls).begin(), v.at(cls).end(), binned_value);
+            vector<histogram::bin>::iterator fnd = std::find(v.at(cls).begin(), v.at(cls).end(), binned_value);
             if(fnd != v.at(cls).end())
             {
                 ++(*fnd);
@@ -364,7 +367,7 @@ class des::histogram : public des::observer {
          *
          * @return Vector indexed by class, then by bucket.
          */
-        inline std::vector<std::vector<bin>> get()
+        inline vector<vector<bin>> get()
         {
             return v;
         }
@@ -421,22 +424,22 @@ class des::histogram : public des::observer {
          * @return Rows of @c {bucket, mean, lower, upper}; empty if fewer than
          *         two completed runs are available.
          */
-        inline std::vector<std::vector<double>> confidence_interval(double alpha, int cls)
+        inline vector<vector<double>> confidence_interval(double alpha, int cls)
         {
             if(s_runs.size() > 0 && s_runs.at(cls).size() > 1)
             {
-                std::vector<std::vector<double>> ci;
-                std::vector<double> obs(s_runs.at(cls).size(), 0);
-                for(int i = 0; i < s_runs.at(cls).at(0).size(); i++)
+                vector<vector<double>> ci;
+                vector<double> obs(s_runs.at(cls).size(), 0);
+                for(size_t i = 0; i < s_runs.at(cls).at(0).size(); i++)
                 {
                     double mean = 0;
                     pair<double,double> interval;
-                    for(int j = 0; j < s_runs.at(cls).size(); j++)
+                    for(size_t j = 0; j < s_runs.at(cls).size(); j++)
                     {
                         obs.at(j) = s_runs.at(cls).at(j).at(i).count;
                         mean += s_runs.at(cls).at(j).at(i).count;
                     }
-                    mean /= s_runs.at(cls).size();
+                    mean /= static_cast<double>(s_runs.at(cls).size());
                     interval = conf_int(obs, mean, alpha);
                     ci.push_back({s_runs.at(cls).at(0).at(i).value, mean, interval.first, interval.second});
                 }
@@ -444,7 +447,7 @@ class des::histogram : public des::observer {
             }
             else
             {
-                return std::vector<std::vector<double>>();
+                return vector<vector<double>>();
             }
         }
 
@@ -454,14 +457,14 @@ class des::histogram : public des::observer {
          * @param alpha Significance level.
          * @return Outer vector indexed by class.
          */
-        inline std::vector<std::vector<std::vector<double>>> confidence_interval(double alpha)
+        inline vector<vector<vector<double>>> confidence_interval(double alpha)
         {
-            std::vector<std::vector<std::vector<double>>> ci;
+            vector<vector<vector<double>>> ci;
             if(s_runs.size() > 0)
             {
-                for(int i = 0; i < s_runs.size(); i++)
+                for(size_t i = 0; i < s_runs.size(); i++)
                 {
-                    ci.push_back(confidence_interval(alpha,i));
+                    ci.push_back(confidence_interval(alpha, static_cast<int>(i)));
                 }
             }
             return ci;
@@ -481,7 +484,7 @@ class des::histogram : public des::observer {
             std::stringstream stream;
             if(s_runs.size() > 0)
             {
-                std::vector<std::vector<std::vector<double>>> ci = confidence_interval(alpha);
+                vector<vector<vector<double>>> ci = confidence_interval(alpha);
                 for(unsigned int i = 0; i < ci.size(); ++i)
                 {
                     for(unsigned int j = 0; j < ci.at(i).size(); j++)
@@ -559,9 +562,9 @@ class des::histogram : public des::observer {
          * This keeps completed runs comparable even when a bucket appears in one
          * replication but not another.
          */
-        inline void add_missing_bins(std::vector<histogram::bin>& target, const std::vector<histogram::bin>& reference)
+        inline void add_missing_bins(vector<histogram::bin>& target, const vector<histogram::bin>& reference)
         {
-            std::vector<histogram::bin> missing_bins;
+            vector<histogram::bin> missing_bins;
             for(const histogram::bin& bin: reference)
             {
                 if(std::find(target.begin(), target.end(), bin) == target.end())
@@ -574,7 +577,7 @@ class des::histogram : public des::observer {
                 return;
             }
 
-            std::vector<histogram::bin> merged;
+            vector<histogram::bin> merged;
             merge(target.begin(), target.end(), missing_bins.begin(), missing_bins.end(), std::back_inserter(merged));
             target = merged;
         }
@@ -584,7 +587,7 @@ class des::histogram : public des::observer {
          */
         inline void align_run_bins(int cls)
         {
-            std::vector<histogram::bin> reference = v.at(cls);
+            vector<histogram::bin> reference = v.at(cls);
             for(unsigned int i = 0; i < s_runs.at(cls).size(); i++)
             {
                 add_missing_bins(reference, s_runs.at(cls).at(i));
@@ -596,12 +599,12 @@ class des::histogram : public des::observer {
             v.at(cls) = reference;
         }
 
-        std::vector<std::vector<histogram::bin>> v;              ///< Current-run buckets, indexed by class.
+        vector<vector<histogram::bin>> v;              ///< Current-run buckets, indexed by class.
         double bin_size;                                         ///< Width used to quantize raw sample values.
-        std::vector<unsigned int> elements;                      ///< Current-run sample count, per class.
-        std::vector<double> sum;                                 ///< Sum of current-run binned values, per class.
+        vector<unsigned int> elements;                      ///< Current-run sample count, per class.
+        vector<double> sum;                                 ///< Sum of current-run binned values, per class.
         int run;                                                 ///< Number of completed all-class runs.
-        std::vector<std::vector<std::vector<histogram::bin>>> s_runs; ///< Completed-run buckets, indexed by class then run.
+        vector<vector<vector<histogram::bin>>> s_runs; ///< Completed-run buckets, indexed by class then run.
 };
 
 #endif

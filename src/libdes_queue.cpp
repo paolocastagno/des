@@ -115,7 +115,7 @@ namespace des{
         return lst.size();
     }
 
-    void queue::reset(double time, vector<string> keys, bool newrun)
+    void queue::reset(double time, vector<string> keys, bool)
     {
         for(auto it = lst.begin(); it != lst.end(); it++)
         {

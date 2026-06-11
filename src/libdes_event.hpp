@@ -187,7 +187,7 @@ class des::event : public des::object
 		 * @param delta time to subtract to the event's time
 		 * 
 		 */
-		inline void reset(double time, std::vector<string> keys = std::vector<string>(), bool newrun = false) override
+		inline void reset(double time, vector<string> keys = vector<string>(), bool = false) override
 		{
 			double t = get_time();
 			set_time(t > time? t - time : 0);

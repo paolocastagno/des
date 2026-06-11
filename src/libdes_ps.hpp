@@ -3,6 +3,7 @@
 
 #include <list>
 #include <memory>
+#include <utility>
 #include <vector>
 
 #include "libdes_event.hpp"
@@ -72,12 +73,12 @@ class des::ps : public des::policy
 		 * @brief Admits the job and rescales all departure times for the new
 		 *        total weight.  Returns false only when the server is full.
 		 */
-		bool update(shared_ptr<event> e, list<shared_ptr<event>>& l, unsigned int positions, double time);
-		bool update(shared_ptr<event> e, list<shared_ptr<event>>& l, unsigned int positions);
-		bool update(shared_ptr<event> e, list<shared_ptr<event>>& l, double rate);
+		bool update(shared_ptr<event> e, list<shared_ptr<event>>& l, unsigned int positions, double time) override;
+		bool update(shared_ptr<event> e, list<shared_ptr<event>>& l, unsigned int positions) override;
+		bool update(shared_ptr<event> e, list<shared_ptr<event>>& l, double rate) override;
 
 		/** Always dequeues from the front (smallest departure time). */
-		bool front();
+		bool front() override;
 
 		/**
 		 * @brief Rescales remaining jobs' departure times after a departure.

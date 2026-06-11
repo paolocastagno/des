@@ -5,7 +5,7 @@ namespace des {
 ps::ps() : policy("des::ps"), w()
 {}
 
-ps::ps(vector<double> weights) : policy("des::ps"), w(move(weights))
+ps::ps(vector<double> weights) : policy("des::ps"), w(std::move(weights))
 {}
 
 double ps::get_weight(unsigned int cls) const
@@ -49,13 +49,13 @@ bool ps::update(shared_ptr<event> e, list<shared_ptr<event>>& l, unsigned int po
     return true;
 }
 
-bool ps::update(shared_ptr<event> e, list<shared_ptr<event>>& l, unsigned int positions)
+bool ps::update(shared_ptr<event>, list<shared_ptr<event>>&, unsigned int)
 {
     throw runtime_error("des::ps::update wrong function call: time parameter required for processor sharing policy");
     return false;
 }
 
-bool ps::update(shared_ptr<event> e, list<shared_ptr<event>>& l, double rate)
+bool ps::update(shared_ptr<event>, list<shared_ptr<event>>&, double)
 {
     throw runtime_error("des::ps::update wrong function call: no rate parameter in ps class");
     return false;

@@ -42,7 +42,7 @@ class des::source : public des::sourcesink
 		 * @param description String identifier.
 		 * @param gen Shared pseudo-random generator used to sample inter-arrival times.
 		 */
-		source(std::vector<double> r, string description, shared_ptr<mt19937_64> gen);
+		source(vector<double> r, string description, shared_ptr<mt19937_64> gen);
 		/**
 		 * @brief Construct a one-class source without configuring arrival rates.
 		 *
@@ -60,7 +60,7 @@ class des::source : public des::sourcesink
 		 *
 		 * @return Always 0.
 		 */
-		int schedule(shared_ptr<event>& e, std::vector<std::vector<int>> s_map) override;
+		int schedule(shared_ptr<event>& e, vector<vector<int>> s_map) override;
 		/**
 		 * @brief Select a waiting queue for an event rejected from service.
 		 *
@@ -69,7 +69,7 @@ class des::source : public des::sourcesink
 		 *
 		 * @return Always 0.
 		 */
-		int enqueue(shared_ptr<event>& e, std::vector<std::vector<int>> q_map) override;
+		int enqueue(shared_ptr<event>& e, vector<vector<int>> q_map) override;
 		/**
 		 * @brief Schedule the next external arrival after a source departure.
 		 *
@@ -78,7 +78,7 @@ class des::source : public des::sourcesink
 		 *
 		 * @return Always 0.
 		 */
-		int dequeue(shared_ptr<event>& e, std::vector<std::vector<int>> s_map) override;
+		int dequeue(shared_ptr<event>& e, vector<vector<int>> s_map) override;
 		// Utility methods
 		/**
 		 * @brief Reset the source and optionally snapshot attached observers.
@@ -127,7 +127,7 @@ class des::source : public des::sourcesink
 		 */
 		double get_service(unsigned int& cls, unsigned int& idx) override;
 	private:
-        std::vector<double> rate; ///< Arrival rates configured at construction.
-        std::vector<exponential_distribution<double>> exp; ///< Per-class inter-arrival distributions.
+        vector<double> rate; ///< Arrival rates configured at construction.
+        vector<exponential_distribution<double>> exp; ///< Per-class inter-arrival distributions.
 };
 #endif

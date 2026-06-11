@@ -35,7 +35,7 @@ class des::policy : public des::object
 		 * @param l   the full list of events still in the queue (including the one about to leave)
 		 * @param time current simulation time (= departure time of the leaving job)
 		 */
-		virtual void on_dequeue(list<shared_ptr<event>>& l, double time) {}
+		virtual void on_dequeue(list<shared_ptr<event>>&, double) {}
 		inline string get_description() const
 		{
 			return description;

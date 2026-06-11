@@ -39,19 +39,19 @@ namespace des
 		// q.push_back(shared_ptr<queue>(shared_ptr<queue>(new queue(numeric_limits<int>::max(), shared_ptr<policy>(new fifo())))));
 	}
 
-	double source::get_service(unsigned int& cls, unsigned int& idx)
+	double source::get_service(unsigned int& cls, unsigned int&)
 	{
 		return exp.at(cls)(*gen.get());
 	}
 
-	int source::enqueue(shared_ptr<event>& e, vector<vector<int>> q_map)
+	int source::enqueue(shared_ptr<event>&, vector<vector<int>>)
 	{
 		// object::TraceLoc(source_location::current(), std::to_string(e->get_id()), " time ",
 		// 				 e->get_time(), " node ", std::to_string(get_id()));
 		return 0;
 	}
 
-	int source::dequeue(shared_ptr<event>& e, vector<vector<int>> q_map)
+	int source::dequeue(shared_ptr<event>& e, vector<vector<int>>)
 	{
 		// object::TraceLoc(source_location::current(), std::to_string(e->get_id()), " time ",
 		// 				 e->get_time(), " node ", std::to_string(get_id()));
@@ -62,7 +62,7 @@ namespace des
 		return 0;
 	}
 
-	int source::schedule(shared_ptr<event>& e, vector<vector<int>> s_map)
+	int source::schedule(shared_ptr<event>&, vector<vector<int>>)
 	{
 		return 0;
 	}

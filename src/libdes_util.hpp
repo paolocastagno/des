@@ -23,7 +23,7 @@
  * fewer than two observations.
  */
 template <typename T>
-inline double stddev(const std::vector<T>& v, double mean)
+inline double stddev(const vector<T>& v, double mean)
 {
     double sdev = __DBL_MAX__;
     size_t size = v.size();
@@ -51,7 +51,7 @@ inline double stddev(const std::vector<T>& v, double mean)
  * than two observations.
  */
 template <typename T>
-inline double sample_stddev(const std::vector<T>& v, double mean)
+inline double sample_stddev(const vector<T>& v, double mean)
 {
     double sdev = __DBL_MAX__;
     size_t size = v.size();
@@ -74,7 +74,7 @@ inline double sample_stddev(const std::vector<T>& v, double mean)
  * @return Arithmetic mean of @p v.
  */
 template <typename T>
-inline double vector_mean(const std::vector<T>& v)
+inline double vector_mean(const vector<T>& v)
 {
     double mean = 0;
     for(const T& d: v)
@@ -155,7 +155,7 @@ inline double student_t_quantile(double probability, double degrees_freedom)
  * when the interval cannot be computed.
  */
 template <typename T>
-inline std::pair<double, double> conf_int(const std::vector<T>& v, double mean, double alpha)
+inline std::pair<double, double> conf_int(const vector<T>& v, double mean, double alpha)
 {
     if(v.size() < 2 || alpha <= 0.0 || alpha >= 1.0)
         return std::pair<double,double>(__DBL_MIN__, __DBL_MAX__);
@@ -177,7 +177,7 @@ inline std::pair<double, double> conf_int(const std::vector<T>& v, double mean, 
  * when the interval cannot be computed.
  */
 template <typename T>
-inline std::pair<double, double> conf_int(const std::vector<T>& v, double alpha)
+inline std::pair<double, double> conf_int(const vector<T>& v, double alpha)
 {
     if(v.size() < 2 || alpha <= 0.0 || alpha >= 1.0)
         return std::pair<double,double>(__DBL_MIN__, __DBL_MAX__);

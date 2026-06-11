@@ -44,14 +44,15 @@ class des::scalar : public des::observer {
         scalar(const string& description, int cls) : observer()
         {
             observer_id = description;
-            for(unsigned int i = 0; i < cls; i++)
+            const auto class_count = static_cast<size_t>(cls);
+            for(size_t i = 0; i < class_count; i++)
             {
                 v.push_back(0);
                 n.push_back(0);
                 a.push_back(0.0);
                 q.push_back(0.0);
             }
-            s_runs = vector<vector<double>>(cls, vector<double>());
+            s_runs = vector<vector<double>>(class_count, vector<double>());
             run = 0;
         }
         /**
@@ -276,9 +277,9 @@ class des::scalar : public des::observer {
             vector<pair<double,double>> ci;
             if(s_runs.size() > 0)
             {
-                for(int i = 0; i < s_runs.size(); i++)
+                for(size_t i = 0; i < s_runs.size(); i++)
                 {
-                    ci.push_back(confidence_interval(alpha,i));
+                    ci.push_back(confidence_interval(alpha, static_cast<int>(i)));
                 }
             }
             return ci;

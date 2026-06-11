@@ -133,8 +133,8 @@ namespace des
 							string description,
 							shared_ptr<mt19937_64> gen) : 
 					station<TT, T>::station(rand_dist,
-											numeric_limits<int>::max(),
 											1,
+											numeric_limits<int>::max(),
 											description,
 											gen)
 	{};

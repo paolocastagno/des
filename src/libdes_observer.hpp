@@ -4,7 +4,6 @@
 #include <string>
 #include <memory>
 
-#include "libdes_observable.hpp"
 #include "libdes_message.hpp"
 
 using namespace std;

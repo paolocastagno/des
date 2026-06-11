@@ -135,7 +135,7 @@ namespace des
 		}
 	}
 
-	pair<bool, int> network::hbfunc(shared_ptr<event>, int destination, const vector<vector<vector<double>>>& route, shared_ptr<mt19937_64>& g)
+	pair<bool, int> network::hbfunc(shared_ptr<event>, int, const vector<vector<vector<double>>>&, shared_ptr<mt19937_64>&)
 	{
 		return make_pair<bool, int>(false, 0);
 	}
@@ -144,7 +144,7 @@ namespace des
 	{
 		uniform_real_distribution<double> dist;
 		int i = 0;
-		double rnd = dist(*gen.get()), cum = 0.0;
+		double rnd = dist(*g.get()), cum = 0.0;
 		vector<vector<double>> rtg_vec = route.at(e -> get_info(EVENT_NODE).second);
 		do
 		{

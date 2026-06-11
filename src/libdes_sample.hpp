@@ -20,6 +20,8 @@ namespace des
 
 class des::sample : public des::observer {
     public:
+        using observer::update;
+
         /**
          * @brief Construct a new sample observer.
          *
@@ -30,12 +32,13 @@ class des::sample : public des::observer {
         sample(const string& description, int cls) : observer()
         {
             observer_id = description;
-            for(unsigned int i = 0; i < cls; i++)
+            const auto class_count = static_cast<size_t>(cls);
+            for(size_t i = 0; i < class_count; i++)
             {
                 v.push_back({});
                 sum.push_back(0);
             }
-            s_runs = std::vector<std::vector<double>>(cls, std::vector<double>());
+            s_runs = vector<vector<double>>(class_count, vector<double>());
             run = 0;
         }
         /**
@@ -139,9 +142,9 @@ class des::sample : public des::observer {
             {
                 ++run;
             }
-            for(int i = 0; i < v.size(); i++)
+            for(size_t i = 0; i < v.size(); i++)
             {
-                reset(i, newrun);
+                reset(static_cast<int>(i), newrun);
             }
         }
         /**
@@ -163,7 +166,7 @@ class des::sample : public des::observer {
          *
          * @return  Two-dimensional vector: outer index = class, inner = samples in order.
          */
-        inline std::vector<std::vector<double>> get()
+        inline vector<vector<double>> get()
         {
             return v;
         }
@@ -195,23 +198,23 @@ class des::sample : public des::observer {
             }
         }
 
-        inline std::vector<pair<double,double>> confidence_interval(double alpha)
+        inline vector<pair<double,double>> confidence_interval(double alpha)
         {
-            std::vector<pair<double,double>> ci;
+            vector<pair<double,double>> ci;
             if(s_runs.size() > 0)
             {
-                for(int i = 0; i < s_runs.size(); i++)
+                for(size_t i = 0; i < s_runs.size(); i++)
                 {
-                    ci.push_back(confidence_interval(alpha,i));
+                    ci.push_back(confidence_interval(alpha, static_cast<int>(i)));
                 }
             }
             return ci;
         }
 
     private:
-        std::vector<std::vector<double>> v;       ///< All samples, per class.
-        std::vector<double>              sum;     ///< Running sum, per class.
-        std::vector<std::vector<double>> s_runs;  ///< Per-class store of completed-run sums.
+        vector<vector<double>> v;       ///< All samples, per class.
+        vector<double>              sum;     ///< Running sum, per class.
+        vector<vector<double>> s_runs;  ///< Per-class store of completed-run sums.
         int                              run;     ///< Number of completed runs.
 };
 

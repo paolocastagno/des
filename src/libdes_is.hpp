@@ -32,7 +32,7 @@ class des::is : public des::policy
 		 * @return true 
 		 * @return false 
 		 */
-		bool update(shared_ptr<event> e, list<shared_ptr<event>>& l, unsigned int positions, double rate);
+		bool update(shared_ptr<event> e, list<shared_ptr<event>>& l, unsigned int positions, double rate) override;
 		/**
 		 * @brief 
 		 * 
@@ -42,7 +42,7 @@ class des::is : public des::policy
 		 * @return true 
 		 * @return false 
 		 */
-		bool update(shared_ptr<event> e, list<shared_ptr<event>>& l, unsigned int positions);
+		bool update(shared_ptr<event> e, list<shared_ptr<event>>& l, unsigned int positions) override;
 		/**
 		 * @brief 
 		 * 
@@ -52,13 +52,13 @@ class des::is : public des::policy
 		 * @return true 
 		 * @return false 
 		 */
-		bool update(shared_ptr<event> e, list<shared_ptr<event>>& l, double rate);
+		bool update(shared_ptr<event> e, list<shared_ptr<event>>& l, double rate) override;
 		/**
 		 * @brief 
 		 * 
 		 * @return true 
 		 * @return false 
 		 */
-		bool front();
+		bool front() override;
 };
 #endif

@@ -51,7 +51,7 @@ namespace des
 
 	node::node(string desc, int cls) : node::node(desc)
 	{
-		for(unsigned int i = 0; i < cls - 1; i++)
+		for(int i = 1; i < cls; i++)
 		{
 			in.push_back(0);
 			out.push_back(0);
@@ -62,7 +62,7 @@ namespace des
 	
 	node::node(string desc, int cls, shared_ptr<mt19937_64> g) : node::node(desc, g)
 	{
-		for(unsigned int i = 0; i < cls - 1; i++)
+		for(int i = 1; i < cls; i++)
 		{
 			in.push_back(0);
 			out.push_back(0);
@@ -71,7 +71,7 @@ namespace des
 		}
 	}
 
-	node::node(unsigned int cls, vector<shared_ptr<queue>> q, vector<shared_ptr<queue>> s, vector<vector<int>> qmap,
+	node::node(unsigned int cls, vector<shared_ptr<queue>> q_vec, vector<shared_ptr<queue>> s_vec, vector<vector<int>> qmap,
 			vector<vector<int>> smap, string description, shared_ptr<mt19937_64> g): node::node(description, g)
 	{
 		for(unsigned int i = 1; i < cls - 1; i++)
@@ -81,6 +81,8 @@ namespace des
 			last_event.push_back(0);
 			usage.push_back(0);
 		}
+		q = q_vec;
+		s = s_vec;
 		q_map = qmap;
 		s_map = smap;
 	}

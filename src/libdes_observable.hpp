@@ -2,6 +2,8 @@
 #define OBSERVABLE_H
 
 #include <iostream>
+#include <list>
+#include <stdexcept>
 #include <string>
 #include <unordered_map>
 #include <memory>

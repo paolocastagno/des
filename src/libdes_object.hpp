@@ -105,14 +105,14 @@ class des::object{
          * 
          * @param param 
          */
-        virtual void reset(double param, vector<string> keys = vector<string>(), bool newrun = false)
+        virtual void reset(double, vector<string> = vector<string>(), bool = false)
         {}
         /**
          * @brief Resets the state of the object to param
          * 
          * @param param 
          */
-        virtual void reset(vector<string> keys = vector<string>(), bool newrun = false)
+        virtual void reset(vector<string> = vector<string>(), bool = false)
         {}
         /**
          * @brief Resets the current state of the object to the initial state
