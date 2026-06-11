@@ -5,24 +5,11 @@ namespace des
 	sink::sink(string description, int cls) : sourcesink(description, cls)
 	{
 		set_sid(description);
-		vector<pair<int, vector<int>>> s_map;
-		// Setup the mapping between event class and server where jobs are served
-		q.clear();
-		q_map.clear();
-		s_map.push_back(make_pair<int, vector<int>>(1, vector<int>(1, 1)));
-		s.push_back(shared_ptr<queue>(shared_ptr<queue>(new queue(numeric_limits<int>::max(), shared_ptr<policy>(new fifo())))));
+		s.push_back(shared_ptr<queue>(new queue(numeric_limits<int>::max(), shared_ptr<policy>(new fifo()))));
 	}
 
 	sink::sink(string description) : sink(description, 1)
-	{
-		set_sid(description);
-		vector<pair<int, vector<int>>> s_map;
-		// Setup the mapping between event class and server where jobs are served
-		q.clear();
-		q_map.clear();
-		s_map.push_back(make_pair<int, vector<int>>(1, vector<int>(1, 1)));
-		s.push_back(shared_ptr<queue>(shared_ptr<queue>(new queue(numeric_limits<int>::max(), shared_ptr<policy>(new fifo())))));
-	}
+	{}
 
 	sink::~sink()
 	{}

@@ -22,65 +22,61 @@ namespace des
 	class sourcesink;
 }
 
+/**
+ * @brief Shared base for external source and terminal sink nodes.
+ *
+ * sourcesink keeps the common node behavior used by source and sink and owns a
+ * process-wide pool of reusable event objects. Sinks return completed events to
+ * the pool with dispose_event(); sources take events back with get_event() when
+ * creating the next external arrival.
+ */
 class des::sourcesink : public des::node
 {
 	public:
 		/**
-		 * @brief Construct a new des::SourceSink object representing a sink. Every SourceSink object handles events according to a FIFO queue and a SingleServer server.
-		 * 
-		 * @param description String identifier
+		 * @brief Construct a one-class source/sink base node.
+		 *
+		 * @param description String identifier.
 		 */
 		sourcesink(string description) : node::node(description)
 		{}
 
 		/**
-		 * @brief Construct a new des::SourceSink object representing a source. Every SourceSink object handles events according to a FIFO queue and a SingleServer server.
-		 * 
-		 * @param r Vector specifying per class service rates 
-		 * @param description String identifier
-		 * @param rdev The global std::mt19937_64 pseudo-random generator
+		 * @brief Construct a source/sink base node for multiple event classes.
+		 *
+		 * @param description String identifier.
+		 * @param cls Number of event classes.
 		 */
 		sourcesink(string description, int cls) : node::node(description, cls){};
 		/**
-		 * @brief Construct a new des::SourceSink object representing a source. Every SourceSink object handles events according to a FIFO queue and a SingleServer server.
-		 * 
-		 * @param r Vector specifying per class service rates 
-		 * @param description String identifier
-		 * @param rdev The global std::mt19937_64 pseudo-random generator
+		 * @brief Construct a one-class source/sink base node with a generator.
+		 *
+		 * @param description String identifier.
+		 * @param gen Shared pseudo-random generator.
 		 */
 		sourcesink(string description, shared_ptr<mt19937_64> gen) : node::node(description, gen){};
 		/**
-		 * @brief Construct a new des::SourceSink object representing a source. Every SourceSink object handles events according to a FIFO queue and a SingleServer server.
-		 * 
-		 * @param description String identifier
-		 * @param cls the number of event classes
-		 * @param gen The global std::mt19937_64 pseudo-random generator
+		 * @brief Construct a source/sink base node with classes and a generator.
+		 *
+		 * @param description String identifier.
+		 * @param cls Number of event classes.
+		 * @param gen Shared pseudo-random generator.
 		 */
 		sourcesink(string description, int cls, shared_ptr<mt19937_64> gen) : node::node(description, cls, gen){};
 		/**
-		 * @brief Destroy the sourcesink object
-		 * 
+		 * @brief Destroy the source/sink base.
 		 */
 		virtual ~sourcesink() {}
-		/**
-		 * @brief Handle a transition of a job from  the queue to the service  
-		 * 
-		 */
-		// virtual int schedule(shared_ptr<event>& e, std::vector<std::vector<int>> s_map) = 0;
-		/**
-		 * @brief Chooses one among the available queue for the current job
-		 * 
-		 * @return an integer used to index the right queue in the q_map structure.
-		 * 
-		 */
-		// virtual int enqueue(shared_ptr<event>& e, std::vector<std::vector<int>> q_map) = 0;
-		/**
-		 * @brief Chooses from which queue to pick the next job among the available queues
-		 * 
-		 * @return an integer used to index the right queue in the s_map structure.
-		 */
-		// virtual int dequeue(shared_ptr<event>& e, std::vector<std::vector<int>> s_map) = 0;
+
 		// Utility methods
+		/**
+		 * @brief Get a cleared event object from the reusable source/sink pool.
+		 *
+		 * Allocates a new event only when the pool is empty. Reused events are
+		 * cleared before being returned.
+		 *
+		 * @return Event ready to be initialized for a new source arrival.
+		 */
 		shared_ptr<event> get_event()
 		{
 			if(events.empty())
@@ -96,47 +92,39 @@ class des::sourcesink : public des::node
 			}
 		}
 		/**
-		 * @brief 
-		 * 
-		 * @param e 
+		 * @brief Return an event to the reusable source/sink pool.
+		 *
+		 * Sinks call this when a routed event reaches the terminal node.
+		 *
+		 * @param e Event to recycle.
 		 */
 		void dispose_event(shared_ptr<event> e)
 		{
 			events.push_back(e);
 		}
 		/**
-		 * @brief 
-		 * 
-		 * @param value 
+		 * @brief Reset the base node and attached observers.
+		 *
+		 * This is a thin delegate to node::reset(). Passing @p newrun through is
+		 * important because observers use it to snapshot completed-run values.
+		 *
+		 * @param value Elapsed simulation time to subtract from pending events.
+		 * @param keys Additional event-info keys whose times should be shifted.
+		 * @param newrun When true, observers snapshot their current-run values.
 		 */
 		void reset(double value, vector<string> keys = vector<string>(), bool newrun = false) override
 		{
 			node::reset(value, keys, newrun);
 		}
 		/**
-		 * @brief 
-		 * 
+		 * @brief Clear node state and attached observer state.
 		 */
 		virtual void clear() override
 		{
 			node::clear();
 		}
-		/**
-		 * @brief 
-		 * 
-		 * @return string 
-		 */
-		// virtual string to_string() const = 0;
-	protected:
-		/**
-		 * @brief Get the service object
-		 * 
-		 * @param cls 
-		 * @return double 
-		 */
-		// virtual double get_service(int& cls) = 0;
 	private:
-		inline static list<shared_ptr<event>> events = list<shared_ptr<event>>();
+		inline static list<shared_ptr<event>> events = list<shared_ptr<event>>(); ///< Shared pool of reusable terminal/source events.
 };
 
 #endif
