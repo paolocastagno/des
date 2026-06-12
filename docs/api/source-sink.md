@@ -36,7 +36,7 @@ Changes the arrival rate for class `cls` after construction.
 
 ### Internal Behaviour
 
-After each departure the source samples a new inter-arrival time from `exponential_distribution(rate[cls])` and schedules the next arrival event, maintaining a self-sustaining stream.
+After each departure the source samples a new inter-arrival time from `std::exponential_distribution<double>(rate[cls])`, clones the departed event into a recycled event object, and schedules the next arrival event. This keeps the external arrival stream self-sustaining after the bootstrap event.
 
 ### Serialisation
 
@@ -56,8 +56,10 @@ A `sink` absorbs all events that arrive at it; no service time is generated and 
 
 ```cpp
 sink(std::string description);
-sink(std::string description, std::shared_ptr<std::mt19937_64> gen);
+sink(std::string description, int cls);
 ```
+
+Use `sink(description, cls)` for multi-class simulations. A legacy rates-based overload is declared in the header for compatibility, but the sink does not use service rates or random sampling.
 
 ### Behaviour
 

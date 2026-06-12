@@ -3,7 +3,7 @@
 **Header:** `libdes_station.hpp`
 **Inherits:** `des::node`
 
-`des::station<TT, T>` is a generic service station parameterised on a numeric type and a distribution template. It serves as an M/G/c/K queue where every component is configurable.
+`des::station<TT, T>` is a generic service station parameterised on a numeric type and a distribution template. It serves as an M/G/c/K queue where queues, server capacity, and queue policies are configurable.
 
 ---
 
@@ -24,23 +24,42 @@ Any distribution from `<random>` that has an `operator()(RNG&)` returning `TT` i
 station(std::vector<std::vector<std::shared_ptr<T<TT>>>> dist,
         unsigned int n_servers,
         unsigned int server_capacity,
-        unsigned int n_classes,
+        unsigned int n_queues,
         unsigned int queue_capacity,
         std::string  description,
+        std::shared_ptr<std::mt19937_64> gen);
+
+station(std::vector<std::vector<std::shared_ptr<T<TT>>>> dist,
+        unsigned int n_servers,
+        unsigned int server_capacity,
+        unsigned int n_queues,
+        unsigned int queue_capacity,
+        std::shared_ptr<des::policy> queue_policy,
+        std::shared_ptr<des::policy> server_policy,
+        std::string  description,
+        std::shared_ptr<std::mt19937_64> gen);
+
+station(std::vector<std::vector<std::shared_ptr<T<TT>>>> dist,
+        unsigned int n_servers,
+        unsigned int server_capacity,
+        std::shared_ptr<des::policy> server_policy,
+        std::string description,
         std::shared_ptr<std::mt19937_64> gen);
 ```
 
 | Parameter | Description |
 |---|---|
-| `dist` | 2-D matrix of distributions `[server_idx][class_idx]`. Each server may have a different distribution per class. |
+| `dist` | 2-D matrix of distributions `[server_idx][class_idx]`. Each server may have a different distribution per class; the class count is inferred from `dist[0].size()`. |
 | `n_servers` | Number of parallel servers |
 | `server_capacity` | Maximum jobs per server (use `1` for standard servers, `INT_MAX` for IS) |
-| `n_classes` | Number of event classes |
+| `n_queues` | Number of waiting queues |
 | `queue_capacity` | Maximum events in the waiting queue (`INT_MAX` = unlimited) |
+| `queue_policy` | Queue policy for waiting queues (`des::fifo` by default) |
+| `server_policy` | Queue policy for server queues (`des::fifo`, `des::is`, `des::ps`, etc.) |
 | `description` | Human-readable label |
 | `gen` | Shared RNG |
 
-Several shorter overloads exist that omit optional parameters and apply sensible defaults (e.g. single class, unlimited queue).
+Additional overloads accept a custom service-pick handler, omit the waiting queues for server-only stations, or use `station(dist, description, gen)` as a one-server infinite-server-style convenience constructor.
 
 ---
 
@@ -58,9 +77,9 @@ Returns the distribution object for class `cls` on server `idx`.
 
 `get_service()` samples the distribution assigned to the chosen server and event class, returning the service duration. The base class `des::node` then adds this duration to the current time to schedule the departure event.
 
-`enqueue()` places a blocked event into the waiting queue.
-`dequeue()` selects the next waiting event when a server becomes free.
-`schedule()` assigns an event to a server.
+`enqueue()` returns the waiting-queue index for a blocked event.
+`dequeue()` returns the waiting-queue index for the next event to move into service.
+`schedule()` returns the server index for an arriving or newly scheduled event.
 
 The station can also use a **custom service-pick handler** to choose from which waiting queue the next job should be moved to service (for example strict class priority).
 
@@ -104,7 +123,7 @@ int class_priority_pick(std::shared_ptr<des::event> trigger,
         {
             if (cls >= 0 && cls < static_cast<int>(q_map[qidx].size()) &&
                 q_map[qidx][cls] != 0 &&
-                queues[qidx]->in_queue() != 0)
+                queues[qidx]->size() != 0)
             {
                 return static_cast<int>(qidx);
             }
@@ -129,7 +148,7 @@ A PS station has a single logical server with unlimited capacity and a `des::ps`
 auto mu = std::make_shared<exponential_distribution<double>>(1.0);
 
 auto ps_sta = std::make_shared<des::station<double, exponential_distribution>>(
-    std::vector<std::vector<std::shared_ptr<exponential_distribution<double>>>>{{mu}},
+    std::vector<std::vector<std::shared_ptr<exponential_distribution<double>>>>{{{mu}}},
     1,                                          // 1 server
     std::numeric_limits<unsigned int>::max(),   // unlimited → never full
     std::make_shared<des::ps>(),
@@ -170,7 +189,7 @@ auto sta = std::make_shared<des::station<double, exponential_distribution>>(
     },
     2,        // 2 servers
     1,        // 1 job per server
-    1,        // 1 event class
+    1,        // 1 waiting queue
     100,      // queue capacity
     "M/M/2",
     gen);

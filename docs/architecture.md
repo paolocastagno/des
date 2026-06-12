@@ -38,7 +38,7 @@ des::network  (also inherits des::observable)
 des::observer
 ├── des::scalar
 ├── des::counter
-├── des::vector
+├── des::sample
 └── des::histogram
 
 des::policy
@@ -59,11 +59,11 @@ Each node owns one or more `des::queue` objects that act as its local Future Eve
 
 ### 2. Observer Pattern
 
-Nodes inherit from `des::observable`. Any `des::observer` subclass (`scalar`, `counter`, `vector`, `histogram`) can be **attached** to a node on a named signal (e.g. `SIGNAL_NODE_ARRIVAL`, `SIGNAL_NODE_DEPARTURE`). When the node fires that signal it serialises relevant state into a `des::message` and calls `notify()`, which forwards the message to all registered observers.
+Nodes inherit from `des::observable`. Any `des::observer` subclass (`scalar`, `counter`, `sample`, `histogram`) can be **attached** to a node on a named signal (e.g. `SIGNAL_NODE_ARRIVAL`, `SIGNAL_NODE_DEPARTURE`). When the node fires that signal it serialises relevant state into a `des::message` and calls `notify()`, which forwards the message to all registered observers.
 
 ```cpp
 auto throughput = std::make_shared<des::scalar>("throughput", 1);
-myNode->attach("throughput", SIGNAL_NODE_DEPARTURE, throughput);
+myNode->attach(SIGNAL_NODE_DEPARTURE, throughput);
 ```
 
 ### 3. Policy Pattern (Queue Disciplines)
@@ -110,13 +110,13 @@ A typical main loop looks like this:
 for (int i = 0; i < N_EVENTS; ++i)
 {
     auto e = net.next_event();    // 1. Find globally earliest event
-    net.route(e, e->get_time());  // 2. Process it (generate next events, notify observers)
+    net.route(e);                 // 2. Process it (generate next events, notify observers)
 }
 ```
 
 `next_event()` scans all nodes for their minimum scheduled time, removes that event from its queue, and returns it.
 
-`route()` determines the destination node from the routing matrix, calls `arrival()` on it, which in turn calls `get_service()` and schedules the departure event.
+`route()` reads the event's current node from `EVENT_NODE`, determines the destination node from the routing matrix, calls `arrival()` on it, updates network flow observers, and refreshes the next-event heap for the affected node.
 
 ---
 

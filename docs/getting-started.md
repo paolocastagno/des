@@ -2,7 +2,7 @@
 
 ## Prerequisites
 
-- A C++20-capable compiler (`g++` >= 10 or `clang++` >= 12)
+- A C++23-capable compiler by default, or a C++20-capable compiler when building with `CXXSTD=c++20`
 - GNU Make
 - macOS or Linux
 
@@ -25,7 +25,12 @@ This produces a shared library file:
 | Command | Effect |
 |---|---|
 | `make` | Debug build (default) |
-| `make DEBUG=0` | Optimised build (no `-g`, with `-O3`) |
+| `make release` | Release build (`-O3`, `-DNDEBUG`) |
+| `make debug` | Clean rebuild in debug mode (`-O0`, `-g`, `-DDEBUG`) |
+| `make optimized` | Alias for `make release` |
+| `make BUILD=release` | Release build without the clean step |
+| `make DEBUG=0` | Backward-compatible release build selector |
+| `make CXXSTD=c++20` | Build with a different C++ standard |
 | `make install` | Build and run `install.sh` to install system-wide |
 | `make clean` | Remove object files |
 | `make clean-lib` | Remove the compiled library |
@@ -53,7 +58,7 @@ The snippet below creates a single-queue M/M/1 simulation with a source, one FIF
 ```cpp
 #include <memory>
 #include <random>
-#include <exponential_distribution>
+#include <vector>
 
 #include <libdes_const.hpp>
 #include <libdes_event.hpp>
@@ -65,18 +70,19 @@ The snippet below creates a single-queue M/M/1 simulation with a source, one FIF
 int main()
 {
     // Shared random-number generator (seeded for reproducibility)
-    auto gen = std::make_shared<std::mt19937_64>(42);
+    auto gen = std::make_shared<std::mt19937_64>();
+    gen->seed(42);
 
     // Arrival rate lambda = 0.8 events/time unit
     auto src  = std::make_shared<des::source>(std::vector<double>{0.8}, "Source", gen);
 
     // Service rate mu = 1.0 — exponential service time
-    auto svc  = std::make_shared<exponential_distribution<double>>(1.0);
-    auto sta  = std::make_shared<des::station<double, exponential_distribution>>(
-                    std::vector<std::vector<std::shared_ptr<exponential_distribution<double>>>>{{{svc}}},
+    auto svc  = std::make_shared<std::exponential_distribution<double>>(1.0);
+    auto sta  = std::make_shared<des::station<double, std::exponential_distribution>>(
+                    std::vector<std::vector<std::shared_ptr<std::exponential_distribution<double>>>>{{{svc}}},
                     1,      // number of servers
                     1,      // server capacity
-                    1,      // number of event classes
+                    1,      // number of waiting queues
                     100,    // queue capacity
                     "M/M/1",
                     gen);
@@ -103,7 +109,7 @@ int main()
     for (int i = 0; i < 50000; ++i)
     {
         e = net.next_event();
-        net.route(e, e->get_time());
+        net.route(e);
     }
 
     return 0;

@@ -5,7 +5,7 @@
 **Header:** `libdes_queue.hpp`
 **Inherits:** `des::object`
 
-A `queue` manages an ordered collection of events according to a pluggable `policy`. Nodes own one or more queues (waiting queue and server queue).
+A `queue` manages an ordered collection of events according to a pluggable `policy`. Nodes own one or more queues (waiting queue and server queue). Most queue operations are intentionally used through `des::node` / `des::station`, which are friends of `des::queue`.
 
 ### Constructors
 
@@ -23,10 +23,20 @@ queue(unsigned int positions, std::shared_ptr<policy> pol);
 
 ### Key Methods
 
+Public:
+
 ```cpp
-bool     is_full();
-unsigned in_queue();          // current occupancy
-double   min_time();          // earliest event time in the queue
+int size() const;
+std::string to_string() const;
+```
+
+Used internally by nodes and stations:
+
+```cpp
+bool   enqueue(std::shared_ptr<event> e, double time);
+bool   is_full() const;
+int    in_queue() const;      // current occupancy
+double min_time() const;      // earliest event time in the queue
 ```
 
 #### Dequeue overloads
@@ -41,13 +51,17 @@ shared_ptr<event> dequeue(double time);  // pop with time context
 ### Configuration
 
 ```cpp
-int                    get_positions();
-void                   set_positions(int positions);
-std::shared_ptr<policy> get_policy();
-void                   set_policy(policy* pol);
+int         get_positions() const;
+void        set_positions(int positions);
+std::string get_policy() const;
+void        set_policy(policy* pol);
 ```
 
+These configuration helpers are also internal to the node/station implementation.
+
 ### Reset / Clear
+
+Used internally when nodes and networks reset simulation state:
 
 ```cpp
 void reset(double time, std::vector<std::string> keys, bool newrun);
@@ -181,7 +195,7 @@ auto mu  = std::make_shared<exponential_distribution<double>>(1.0);
 auto ps_policy = std::make_shared<des::ps>();
 
 auto sta = std::make_shared<des::station<double, exponential_distribution>>(
-    std::vector<std::vector<std::shared_ptr<exponential_distribution<double>>>>{{mu}},
+    std::vector<std::vector<std::shared_ptr<exponential_distribution<double>>>>{{{mu}}},
     1,                                         // 1 server
     std::numeric_limits<unsigned int>::max(),  // unlimited capacity → never full
     ps_policy,

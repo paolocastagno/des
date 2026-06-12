@@ -30,10 +30,10 @@ void set_keyvalue(std::unordered_map<std::string, double> map);
 ## Reading Entries
 
 ```cpp
-double get_value(std::string key);
+double get_value(const std::string& key) const;
 ```
 
-Returns the value for `key`. Throws (or returns `0`) if the key is absent.
+Returns the value for `key`, or `0` if the key is absent.
 
 ---
 

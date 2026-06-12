@@ -15,19 +15,37 @@ network(std::vector<std::shared_ptr<node>> nodes,
         std::vector<std::vector<std::vector<double>>> routing,
         std::shared_ptr<std::mt19937_64>& gen);
 
+// With custom routing/fork handler
+network(std::vector<std::shared_ptr<node>> nodes,
+        std::vector<std::vector<std::vector<double>>> routing,
+        int (*fork_handler)(
+            std::shared_ptr<event>,
+            const std::vector<std::vector<std::vector<double>>>& routing,
+            std::shared_ptr<std::mt19937_64>& gen),
+        std::shared_ptr<std::mt19937_64>& gen);
+
 // With custom block handler
 network(std::vector<std::shared_ptr<node>> nodes,
         std::vector<std::vector<std::vector<double>>> routing,
-        std::function<std::pair<bool,int>(std::shared_ptr<event>, int,
-            const std::vector<std::vector<std::vector<double>>>&,
-            std::shared_ptr<std::mt19937_64>&)> block_handler,
+        std::pair<bool,int> (*block_handler)(
+            std::shared_ptr<event>,
+            int destination,
+            const std::vector<std::vector<std::vector<double>>>& routing,
+            std::shared_ptr<std::mt19937_64>& gen),
         std::shared_ptr<std::mt19937_64>& gen);
 
-// With custom fork and block handlers
+// With custom routing/fork and block handlers
 network(std::vector<std::shared_ptr<node>> nodes,
         std::vector<std::vector<std::vector<double>>> routing,
-        std::function<...> fork_handler,
-        std::function<...> block_handler,
+        int (*fork_handler)(
+            std::shared_ptr<event>,
+            const std::vector<std::vector<std::vector<double>>>& routing,
+            std::shared_ptr<std::mt19937_64>& gen),
+        std::pair<bool,int> (*block_handler)(
+            std::shared_ptr<event>,
+            int destination,
+            const std::vector<std::vector<std::vector<double>>>& routing,
+            std::shared_ptr<std::mt19937_64>& gen),
         std::shared_ptr<std::mt19937_64>& gen);
 ```
 
@@ -50,7 +68,15 @@ std::pair<bool, int> handler(std::shared_ptr<des::event> e,
 
 Return `{true, alternative_destination}` to reroute, or `{false, _}` to drop the event.
 
-**Fork handler** — called before routing to allow splitting or custom destination selection.
+**Routing/fork handler** — called before default routing to allow custom destination selection. Signature:
+
+```cpp
+int handler(std::shared_ptr<des::event> e,
+            const std::vector<std::vector<std::vector<double>>>& routing,
+            std::shared_ptr<std::mt19937_64>& gen);
+```
+
+Return the destination node index. Returning `-1`, or otherwise selecting no positive destination, leaves the event outside the network in the current implementation.
 
 ---
 
@@ -60,13 +86,13 @@ Return `{true, alternative_destination}` to reroute, or `{false, _}` to drop the
 std::shared_ptr<event> next_event();
 ```
 
-Scans all nodes for the earliest scheduled departure and returns that event (removing it from its node's server queue).
+Returns the earliest scheduled departure and removes it from its node's server queue. If the internal heap is empty, it is rebuilt from the current nodes first; if no event is pending, `nullptr` is returned.
 
 ```cpp
-void route(std::shared_ptr<event> e, const double& time);
+void route(std::shared_ptr<event> e);
 ```
 
-Determines the destination node from the routing matrix (sampling `routing[src][dst][cls]`), calls `arrival()` on it, and updates flow counters. If the destination is full, the block handler is invoked.
+Reads the source node from `EVENT_NODE`, determines the destination node from the routing matrix or custom routing handler, calls `arrival()` on it, updates flow counters, and refreshes the heap entry for the affected destination. If the destination is full, the block handler is invoked.
 
 ---
 
@@ -75,10 +101,11 @@ Determines the destination node from the routing matrix (sampling `routing[src][
 All flow statistics are maintained per `(source, destination, class)` triple.
 
 ```cpp
-double get_count(int source, int destination, int cls);
+int    get_count(int source, int destination, int cls);
 double flow(int source, int destination, int cls);
 double get_flow(int source, int destination, int cls);
 double get_flow_stddev(int source, int destination, int cls);
+std::shared_ptr<observer> get_observer(const std::string& signal, unsigned int idx);
 ```
 
 `get_count` returns the raw event count for the current run.
@@ -88,8 +115,10 @@ double get_flow_stddev(int source, int destination, int cls);
 ### Confidence Intervals
 
 ```cpp
-std::pair<double,double> get_count_ci(int src, int dst, int cls, double alpha = 0.05);
-std::pair<double,double> get_flow_ci(int src, int dst, int cls, double alpha = 0.05);
+std::pair<double,double> get_count_ci(int src, int dst, int cls, double alpha);
+std::pair<double,double> get_flow_ci(int src, int dst, int cls, double alpha);
+std::vector<std::pair<double,double>> get_count_ci(int src, int dst, double alpha);
+std::vector<std::pair<double,double>> get_flow_ci(int src, int dst, double alpha);
 ```
 
 ---
@@ -126,7 +155,7 @@ des::network net({src, sta, snk}, routing, gen);
 for (int i = 0; i < 100000; ++i)
 {
     auto e = net.next_event();
-    net.route(e, e->get_time());
+    net.route(e);
 }
 
 double throughput = net.get_flow(1, 2, 0);   // station -> sink throughput

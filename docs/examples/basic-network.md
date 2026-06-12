@@ -49,14 +49,14 @@ auto sta = make_shared<des::station<double, exponential_distribution>>(
     vector<vector<shared_ptr<exponential_distribution<double>>>>{{{svc}}},
     1,        // 1 server
     1,        // 1 job per server
-    1,        // 1 event class
+    1,        // 1 waiting queue
     INT_MAX,  // unlimited waiting queue
     "M/M/1", gen);
 
 auto snk = make_shared<des::sink>("Sink");
 ```
 
-`des::station<double, exponential_distribution>` is the template instantiation for exponential service times. The distribution matrix is indexed `[server][class]`; with 1 server and 1 class it shrinks to `{{{svc}}}`.
+`des::station<double, exponential_distribution>` is the template instantiation for exponential service times. The distribution matrix is indexed `[server][class]`; with 1 server and 1 class it shrinks to `{{{svc}}}`. The event-class count is inferred from that distribution matrix.
 
 ---
 
@@ -116,11 +116,10 @@ do {
     {
         e = net.next_event();          // find globally earliest event
         sim_time = e->get_time();
-        net.route(e, sim_time);        // route it → fires observer notifications
+        net.route(e);                  // route it → fires observer notifications
     }
 
-    double mean_soj = sojourn->run_avg(0);   // v/n = sample mean for this run
-    sojourn->stddev(0);   // updates internal cross-run mean used by CI
+    double mean_soj = sojourn->mean(0);      // current-run sample mean
 
     cout << "Run " << run
          << "  sim_time = " << sim_time
@@ -134,8 +133,6 @@ while (++run < N_RUNS);
 ```
 
 `net.reset(sim_time, {}, true)` cascades through every node and calls `obs->reset(true)` on each attached observer. This saves the run's statistics before clearing within-run state.
-
-The call to `sojourn->stddev(0)` immediately before the reset propagates the per-run mean into the scalar's internal cross-run accumulator (`s`). Without it, `confidence_interval` would see zero-valued samples.
 
 ---
 

@@ -26,8 +26,8 @@ event(int cls, std::unordered_map<std::string, double> info);
 
 ```cpp
 void   set_time(double time);
-double get_time();          // throws if not initialised
-bool   is_initialized();
+double get_time() const;    // throws if not initialised
+bool   is_initialized() const;
 ```
 
 An event is considered *uninitialised* until `set_time()` has been called at least once.
@@ -38,7 +38,7 @@ An event is considered *uninitialised* until `set_time()` has been called at lea
 
 ```cpp
 void set_cls(int cls);
-int  get_cls();
+int  get_cls() const;
 ```
 
 The class is an integer label used to distinguish event types (e.g. different traffic classes).
@@ -48,11 +48,11 @@ The class is an integer label used to distinguish event types (e.g. different tr
 ## Constraint
 
 ```cpp
-void   set_constraint(double cons);
-double get_constraint();
+void set_constraint(double cons);
+std::pair<bool,double> get_constraint();
 ```
 
-An optional constraint value. Its meaning is user-defined; the library does not enforce it automatically.
+An optional constraint value. The boolean reports whether the constraint key is present. Its meaning is user-defined; the library does not enforce it automatically.
 
 ---
 
@@ -61,14 +61,15 @@ An optional constraint value. Its meaning is user-defined; the library does not 
 The info map stores arbitrary `double` values keyed by string. Standard keys are defined in [`libdes_const.hpp`](constants.md).
 
 ```cpp
-void   set_info(std::string name, double val);
-double get_info(std::string name);            // returns {found, value}
+bool set_info(std::string name, double val);  // false if the key already exists
+std::pair<bool,double> get_info(std::string name) const;
 void   emplace_info(std::string name, double val);  // replace existing
 void   remove_info(std::string name);
 std::unordered_map<std::string, double> get_map_info();
 ```
 
 The important info key used by the network is `EVENT_NODE`, which holds the index of the node that currently owns the event.
+`EVENT_TIME` and `EVENT_CONSTRAINT` are protected from `set_info()`; use `set_time()` and `set_constraint()` for those keys.
 
 ---
 
@@ -80,7 +81,7 @@ void reset(double time, std::vector<std::string> keys, bool newrun);
 void clear();
 ```
 
-`reset()` resets the event time to `time` and clears any info keys listed in `keys`.
+`reset()` subtracts the elapsed `time` from the scheduled event time, clamps negative results to `0`, and applies the same shift to any info keys listed in `keys`.
 
 ---
 

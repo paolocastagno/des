@@ -8,6 +8,6 @@
 | [`des::station`](station.md) | `libdes_station.hpp` | Generic service station |
 | [`des::source` / `des::sink`](source-sink.md) | `libdes_source.hpp`, `libdes_sink.hpp` | Event generators and absorbers |
 | [`des::network`](network.md) | `libdes_network.hpp` | Event routing and global clock |
-| [Observers](observers.md) | `libdes_scalar.hpp` etc. | Measurement collectors |
+| [Observers](observers.md) | `libdes_scalar.hpp`, `libdes_counter.hpp`, `libdes_sample.hpp`, `libdes_histogram.hpp` | Measurement collectors |
 | [`des::message`](message.md) | `libdes_message.hpp` | Key-value observer payload |
 | [Constants](constants.md) | `libdes_const.hpp` | Named keys and signal strings |

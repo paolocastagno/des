@@ -12,15 +12,15 @@ These keys are set in the `des::event` info map.
 
 | Constant | Value | Description |
 |---|---|---|
-| `EVENT_ID` | `"event_id"` | Unique event identifier |
-| `EVENT_CLS` | `"event_cls"` | Event class index |
-| `EVENT_TIME` | `"event_time"` | Scheduled time |
-| `EVENT_CONSTRAINT` | `"event_constraint"` | Optional constraint value |
-| `EVENT_NODE` | `"event_node"` | Index of the owning node |
-| `EVENT_QUEUE` | `"event_queue"` | Index of the queue the event is in |
-| `EVENT_SERVER` | `"event_server"` | Index of the server the event is on |
-| `EVENT_REROUTE` | `"event_reroute"` | Non-zero if the event was rerouted by the block handler |
-| `EVENT_REJECT` | `"event_reject"` | Non-zero if the event was rejected/dropped |
+| `EVENT_ID` | `"id"` | Unique event identifier |
+| `EVENT_CLS` | `"class"` | Event class index |
+| `EVENT_TIME` | `"time"` | Scheduled time |
+| `EVENT_CONSTRAINT` | `"constraint"` | Optional constraint value |
+| `EVENT_NODE` | `"node"` | Index of the owning node |
+| `EVENT_QUEUE` | `"queue_idx"` | Index of the queue the event is in |
+| `EVENT_SERVER` | `"server_idx"` | Index of the server the event is on |
+| `EVENT_REROUTE` | `"reroute"` | Reserved key for custom rerouting logic |
+| `EVENT_REJECT` | `"reject"` | Non-zero if the event was rejected/dropped |
 
 ---
 
@@ -30,8 +30,8 @@ These keys appear in `des::message` payloads sent to observers.
 
 | Constant | Value | Description |
 |---|---|---|
-| `NODE_ARRIVAL` | `"node_arrival"` | Absolute arrival time at the node |
-| `NODE_SERVICE_START` | `"node_service_start"` | Time service began |
+| `NODE_ARRIVAL` | `"arrival_time"` | Absolute arrival time at the node |
+| `NODE_SERVICE_START` | `"service_start_time"` | Time service began |
 | `NODE_SOJOURN` | `"node_sojourn"` | Total time spent in the node (wait + service) |
 | `NODE_WAIT` | `"node_wait"` | Time spent waiting in the queue |
 | `NODE_SERVICE` | `"node_service"` | Time spent in service |
@@ -44,10 +44,10 @@ Passed to `observable::attach()` and `observable::notify()`.
 
 | Constant | Value | Description |
 |---|---|---|
-| `SIGNAL_NODE_ARRIVAL` | `"signal_node_arrival"` | Fired on event arrival at a node |
-| `SIGNAL_NODE_DEPARTURE` | `"signal_node_departure"` | Fired on event departure from a node |
-| `SIGNAL_NODE_SERVICE` | `"signal_node_service"` | Fired when an event enters service |
-| `SIGNAL_NET_ROUTING` | `"signal_net_routing"` | Fired by the network on routing decisions |
+| `SIGNAL_NODE_ARRIVAL` | `"node_arrival"` | Fired on event arrival at a node |
+| `SIGNAL_NODE_DEPARTURE` | `"node_departure"` | Fired on event departure from a node |
+| `SIGNAL_NODE_SERVICE` | `"node_service"` | Fired when an event enters service |
+| `SIGNAL_NET_ROUTING` | `"net_route"` | Prefix for network routing signals |
 
 ---
 
@@ -70,5 +70,5 @@ Used in the constraint field of an event to express relational conditions.
 
 | Constant | Description |
 |---|---|
-| `MESSAGE_KEYVALUE_SEPARATOR` | Separates key from value within a pair |
-| `MESSAGE_PAIR_SEPARATOR` | Separates consecutive key-value pairs in a serialised message |
+| `MESSAGE_KEYVALUE_SEPARATOR` | `","`; separates key from value within a pair |
+| `MESSAGE_PAIR_SEPARATOR` | `";"`; separates consecutive key-value pairs in a serialised message |

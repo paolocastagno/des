@@ -50,12 +50,15 @@ node(std::string description);
 node(std::string description, std::shared_ptr<std::mt19937_64> g);
 node(std::string description, int cls);
 node(std::string description, int cls, std::shared_ptr<std::mt19937_64> g);
+node(unsigned int cls, std::string description, std::shared_ptr<std::mt19937_64> g);
 
 // Full constructor
-node(std::string description,
-     int cls,
+node(unsigned int cls,
      std::vector<std::shared_ptr<des::queue>> queues,
      std::vector<std::shared_ptr<des::queue>> servers,
+     std::vector<std::vector<int>> queue_map,
+     std::vector<std::vector<int>> server_map,
+     std::string description,
      std::shared_ptr<std::mt19937_64> g);
 ```
 
@@ -64,6 +67,9 @@ node(std::string description,
 ```cpp
 void set_queue(std::vector<std::shared_ptr<queue>>& q);
 void set_server(std::vector<std::shared_ptr<queue>>& s);
+void set_queue_map(const std::vector<std::vector<int>>& map);
+void set_server_map(const std::vector<std::vector<int>>& map);
+void set_service_pick_handler(service_pick_handler handler);
 ```
 
 ### State Queries
@@ -78,14 +84,14 @@ unsigned int service_length(unsigned int cls);
 ### Event Processing
 
 ```cpp
-void arrival(std::shared_ptr<event>& e);
+bool arrival(std::shared_ptr<event>& e);
 std::shared_ptr<event> departure();
 double next_event_time();             // earliest scheduled departure
 ```
 
-`arrival()` places the incoming event into a waiting queue (or directly into a server if one is free) and fires `SIGNAL_NODE_ARRIVAL`.
+`arrival()` places the incoming event into a waiting queue, or directly into a server if one is free, and fires `SIGNAL_NODE_ARRIVAL`. It returns `false` when the event cannot be admitted because both service and waiting capacity are unavailable.
 
-`departure()` removes the earliest event from the server queue, fires `SIGNAL_NODE_DEPARTURE` (and `SIGNAL_NODE_SERVICE`), and optionally pulls the next waiting event into service.
+`departure()` removes the earliest event from the server queue, fires `SIGNAL_NODE_DEPARTURE`, and optionally pulls the next waiting event into service. If another event enters service, `SIGNAL_NODE_SERVICE` is fired for that event.
 
 ### Reset / Clear
 
@@ -117,11 +123,22 @@ The `des::message` payload attached to each signal contains the keys `NODE_ARRIV
 Subclasses implement these to define how service times are drawn and how events are scheduled/enqueued/dequeued:
 
 ```cpp
-virtual void get_service(unsigned int& cls, unsigned int& idx) = 0;
-virtual void schedule(std::shared_ptr<event>& e,
-                      std::vector<std::vector<int>> s_map) = 0;
-virtual void enqueue(std::shared_ptr<event>& e,
-                     std::vector<std::vector<int>> q_map) = 0;
-virtual void dequeue(std::shared_ptr<event>& e,
+virtual double get_service(unsigned int& cls, unsigned int& idx) = 0;
+virtual int schedule(std::shared_ptr<event>& e,
                      std::vector<std::vector<int>> s_map) = 0;
+virtual int enqueue(std::shared_ptr<event>& e,
+                    std::vector<std::vector<int>> q_map) = 0;
+virtual int dequeue(std::shared_ptr<event>& e,
+                    std::vector<std::vector<int>> q_map) = 0;
+```
+
+`service_pick_handler` is an optional function pointer used after a departure to choose which waiting queue should supply the next job:
+
+```cpp
+using service_pick_handler =
+    int (*)(std::shared_ptr<event>,
+            int server_idx,
+            const std::vector<std::vector<int>>& queue_map,
+            const std::vector<std::shared_ptr<queue>>& queues,
+            std::shared_ptr<std::mt19937_64>& gen);
 ```

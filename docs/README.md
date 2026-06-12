@@ -24,7 +24,7 @@ Welcome to the **libdes** documentation — a C++ library for building Discrete 
 - [Queue & Policies](api/queue.md) — queue management and FIFO / Infinite-Server policies
 
 ### Measurement
-- [Observers](api/observers.md) — `scalar`, `counter`, `vector`, `histogram`
+- [Observers](api/observers.md) — `scalar`, `counter`, `sample`, `histogram`
 
 ### Utilities
 - [Message](api/message.md) — key-value container used for observer notifications
