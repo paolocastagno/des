@@ -1,24 +1,36 @@
-1. Insert an handler object for the event to avoid custom sort method in queue
+1. Profiling-driven performance improvements
 
-		struct event_handler
-		{
-			event_handler(shared_ptr<event> p) : ptr_(p){}
+	- Replace hot-path unordered_map<string, double> metadata with a
+	  vector-backed event info store addressed by compact runtime tags.
+	  Introduce a tag registry/repository that maps human-readable names to
+	  small integer identifiers once during model/setup time, for example:
 
-			void set_ptr_(shared_ptr<event> p)
-			{
-				ptr_  = p;
-			}
+	      auto customer_type = registry.define("customer_type");
+	      auto priority = registry.define("priority");
 
-			shared_ptr<event> get_ptr_() const
-			{
-				return ptr_;
-			}
+	  Events would then store values by tag index instead of hashing strings on
+	  every get/emplace/remove operation. Built-in DES fields can use predefined
+	  tags, while users can register custom tags without extending a C++ enum or
+	  risking collisions with library-reserved fields. Keep name lookup in the
+	  registry for debugging, logging, and backward-compatible message output.
 
-			bool operator< (const event_handler& rhs)
-			{
-				return *(ptr_.get()) < *(rhs.get_ptr_().get());
-			}
+	- Migrate built-in metadata keys such as NODE_ARRIVAL, NODE_SOJOURN,
+	  EVENT_NODE, EVENT_QUEUE, and EVENT_SERVER to predefined runtime tags.
 
-			shared_ptr<event> ptr_;
-		};
-        
+	- Keep the existing string-based API as a compatibility layer initially,
+	  translating strings through the tag registry at boundaries instead of
+	  using strings in the simulation hot path.
+
+	- Update message and observer APIs to avoid constructing copied maps in hot
+	  paths. Prefer const references or lightweight views over the vector-backed
+	  event info where lifetime rules make that safe.
+
+	- Skip observer-message construction when no observers are attached for the
+	  relevant signal.
+
+	- Re-profile after each change with:
+	      make profile-time
+	      make profile-sample
+	  Use the local-library variants when testing uninstalled workspace changes:
+	      make profile-time-local
+	      make profile-sample-local
