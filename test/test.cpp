@@ -83,7 +83,7 @@ int main()
         {
             e = net.next_event();
             sim_time = e->get_time();
-            net.route(e, sim_time);
+            net.route(e);
         }
 
         double mean_soj = sojourn->mean(0);
