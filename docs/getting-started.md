@@ -24,14 +24,15 @@ This produces a shared library file:
 
 | Command | Effect |
 |---|---|
-| `make` | Debug build (default) |
+| `make` | Release build (default) |
 | `make release` | Release build (`-O3`, `-DNDEBUG`) |
 | `make debug` | Clean rebuild in debug mode (`-O0`, `-g`, `-DDEBUG`) |
 | `make optimized` | Alias for `make release` |
 | `make BUILD=release` | Release build without the clean step |
-| `make DEBUG=0` | Backward-compatible release build selector |
+| `make BUILD=debug` | Debug build without the clean step |
 | `make CXXSTD=c++20` | Build with a different C++ standard |
-| `make install` | Build and run `install.sh` to install system-wide |
+| `make install` | Build and install the headers and library system-wide |
+| `make uninstall` | Remove the system-wide installed headers and library |
 | `make clean` | Remove object files |
 | `make clean-lib` | Remove the compiled library |
 
