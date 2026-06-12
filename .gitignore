@@ -1,0 +1,8 @@
+.DS_Store
+*.d
+*.o
+*.dylib
+*.so
+test/test
+test/test.dSYM/
+profile/
