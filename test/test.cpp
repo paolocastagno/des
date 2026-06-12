@@ -73,13 +73,21 @@ int main()
          << "  rho = "    << lambda / mu << "\n"
          << "  Theoretical mean sojourn = " << 1.0 / (mu - lambda) << "\n\n";
 
-    const int N_EVENTS = 100000;
-    const int N_RUNS   = 5;
+#ifndef DES_TEST_EVENTS
+#define DES_TEST_EVENTS 100000
+#endif
+
+#ifndef DES_TEST_RUNS
+#define DES_TEST_RUNS 5
+#endif
+
+    const int n_events = DES_TEST_EVENTS;
+    const int n_runs   = DES_TEST_RUNS;
     int run = 0;
 
     do {
         double sim_time = 0.0;
-        for (int i = 0; i < N_EVENTS; ++i)
+        for (int i = 0; i < n_events; ++i)
         {
             e = net.next_event();
             sim_time = e->get_time();
@@ -96,13 +104,13 @@ int main()
         // storing each run's result for cross-run confidence intervals.
         net.reset(sim_time, {}, true);
     }
-    while (++run < N_RUNS);
+    while (++run < n_runs);
 
     // ── Cross-run confidence intervals (alpha = 0.05) ──────────────────────
     auto [thr_lo, thr_hi] = net.get_flow_ci(1, 2, 0, 0.05);
     auto [soj_lo, soj_hi] = sojourn->confidence_interval(0.05, 0);
 
-    cout << "\nResults over " << N_RUNS << " replications (95% CI):\n"
+    cout << "\nResults over " << n_runs << " replications (95% CI):\n"
          << "  Throughput   [" << thr_lo << ", " << thr_hi << "]"
          << "  (theory: " << lambda << ")\n"
          << "  Mean sojourn [" << soj_lo << ", " << soj_hi << "]"
