@@ -41,14 +41,14 @@ This produces a shared library file:
 Add the path to the library headers to your include path and link against `libdes`:
 
 ```sh
-g++ -std=c++20 -I/path/to/des/src -c myprogram.cpp
+g++ -std=c++23 -I/path/to/des/src -c myprogram.cpp
 g++ -o myprogram myprogram.o -L/path/to/des -ldes
 ```
 
 If you installed the library system-wide via `make install`:
 
 ```sh
-g++ -std=c++20 -c myprogram.cpp
+g++ -std=c++23 -c myprogram.cpp
 g++ -o myprogram myprogram.o -ldes
 ```
 
