@@ -2,64 +2,61 @@
 
 **Header:** `libdes_message.hpp`
 
-A `message` is a lightweight key-value container used as the payload when nodes notify observers. Keys are strings; values are `double`.
+A `message` is a lightweight container of fields used as the payload when nodes notify observers. Fields are addressed by [tag](tags.md); values are `double`.
+
+Nodes and the network notify observers with a *view* of the event's fields (`message::view_of(e->get_store())`), so no data is copied. A copy of a view message owns its data, and adding or removing a field makes a view take its own copy first, so observers may safely keep messages.
 
 ---
 
 ## Constructors
 
 ```cpp
-message();
-message(std::unordered_map<std::string, double> map);
-message(std::string serialised);   // deserialise from string
+message();                                         // empty
+static message view_of(const tag_store& fields);   // no copy; fields must outlive the message
 ```
 
 ---
 
-## Adding and Removing Entries
+## Adding and Removing Fields
 
 ```cpp
-void add(std::string key, double value);
-void add(std::string key);          // inserts key with value 0.0
-void remove(std::string key);
-void set_keyvalue(std::unordered_map<std::string, double> map);
+void add(tag t, double value);     // replaces any previous value
+void remove(tag t);
 ```
 
 ---
 
-## Reading Entries
+## Reading Fields
 
 ```cpp
-double get_value(const std::string& key) const;
+double get_value(tag t) const;     // 0 if the field is absent
+bool   has(tag t) const;
 ```
-
-Returns the value for `key`, or `0` if the key is absent.
 
 ---
 
 ## Serialisation
 
 ```cpp
-std::string serialize();
-void        deserialize(std::string msg);
+std::string serialize() const;
 ```
 
-The serialised format uses the separators defined in [`libdes_const.hpp`](constants.md):
+Writes the fields as text, e.g. for logging, naming each one after `des::tag_registry::name()`. The format uses the separators defined in [`libdes_const.hpp`](constants.md):
 
-- `MESSAGE_KEYVALUE_SEPARATOR` separates a key from its value within a pair
-- `MESSAGE_PAIR_SEPARATOR` separates one key-value pair from the next
+- `MESSAGE_KEYVALUE_SEPARATOR` separates a name from its value within a pair
+- `MESSAGE_PAIR_SEPARATOR` separates one pair from the next
 
 ---
 
 ## Example
 
 ```cpp
+const des::tag response = des::tag_registry::define("response_time");
+
 des::message msg;
-msg.add("sojourn", 3.14);
-msg.add(NODE_WAIT,  0.5);
+msg.add(response, 3.14);
+msg.add(NODE_WAIT, 0.5);
 
 double w = msg.get_value(NODE_WAIT);   // 0.5
-
-std::string s = msg.serialize();
-des::message msg2(s);                  // reconstructed from string
+std::string s = msg.serialize();       // "node_wait,0.500000;response_time,3.140000;"
 ```

@@ -3,15 +3,19 @@
 namespace des
 {
 	event::event() : object(id_gen++),
-			info()
+			store()
 	{
-		set_info(EVENT_ID, get_id());
-		set_info(EVENT_CLS, 0);
+		store.reserve(tags::BUILTIN_COUNT);
+		store.set(tags::EVENT_ID, get_id());
+		store.set(tags::EVENT_CLS, 0);
 	}
 
-	event::event(int c, unordered_map<string,double> i) : event::event()
+	event::event(int c, const vector<pair<tag, double>>& i) : event::event()
 	{
-		info.insert(i.begin(), i.end());
+		for(const pair<tag, double>& kv: i)
+		{
+			emplace_info(kv.first, kv.second);
+		}
 		set_cls(c);
 	}
 
@@ -20,51 +24,47 @@ namespace des
 		set_cls(c);
 	}
 
-	void event::clone(event e)
+	void event::clone(const event& e)
 	{
 		int id = get_id();
-		info = e.info;
-		emplace_info(EVENT_ID, id);
+		store = e.store;
+		store.set(tags::EVENT_ID, id);
 	}
 
-	void event::emplace_info(string name, double val)
+	void event::shift_times(double time, const vector<tag>& keys)
 	{
-		if(EVENT_TIME== name || EVENT_CONSTRAINT== name)
+		double t = get_time();
+		set_time(t > time? t - time : 0);
+		for(tag k: keys)
 		{
-			throw invalid_argument("Trying to emplace protected key with event::emplace_info(). If it is not a mistake, use event::set_*(double& time) instead. Otherwize, check des/util/util_const.hpp for reserved keys");
+			pair<bool, double> value = store.get(k);
+			if(value.first)
+			{
+				store.set(k, value.second > time? value.second - time : 0);
+			}
 		}
-		info[name] = val;
-	}
-	
-	void event::remove_info(string name)
-	{
-		if(EVENT_TIME== name || EVENT_CONSTRAINT== name)
-		{
-			throw invalid_argument("Trying to remove protected key with event::emplace_info(). If it is not a mistake, use event::set_*(double& time) instead. Otherwize, check des/util/util_const.hpp for reserved keys");
-		}
-		info.erase(name);
 	}
 
 	bool event::is_initialized() const
 	{
-		return info.find(EVENT_CLS) != info.end();
+		return store.has(tags::EVENT_CLS);
 	}
-	
+
 	std::string event::to_string() const
 	{
 		string s = "( ";
 		s.append(std::to_string(get_id()));
 		s.append("\tclass:\t");
 		s.append(std::to_string(get_cls()));
-		for(auto it = info.begin(); it != info.end(); it++)
+		store.for_each([&s](tag t, double v)
 		{
 			s.append("\t");
-			s.append(it -> first);
+			s.append(tag_registry::name(t));
 			s.append(":\t");
-			s.append(std::to_string(it -> second));
-		}
+			s.append(std::to_string(v));
+		});
 		s.append(")");
 		return s;
 	}
-	
+
 }

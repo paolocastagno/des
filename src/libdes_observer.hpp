@@ -1,6 +1,7 @@
 #ifndef OBSERVER_H
 #define OBSERVER_H
 
+#include <atomic>
 #include <string>
 #include <memory>
 
@@ -81,16 +82,9 @@ class des::observer
         /**
          * @brief updates the state of the observer according to the received message
          *
-         * @param message
+         * @param msg fields of the notified event, addressed by des::tag
          */
-        virtual void update(string message) = 0;
-        /**
-         * @brief updates the state of the observer from a message object directly,
-         * avoiding serialize/deserialize. Concrete observers should override this.
-         *
-         * @param msg
-         */
-        virtual void update(const des::message& msg) { update(msg.serialize()); }
+        virtual void update(const des::message& msg) = 0;
         /**
          * @brief Check wheter the observer is associated with an observable entity
          * 
@@ -142,7 +136,7 @@ class des::observer
 		 */
 		string event;
         unsigned int id;
-        inline static unsigned int id_gen = 0;
+        inline static atomic<unsigned int> id_gen{0};
 };
 
 #endif

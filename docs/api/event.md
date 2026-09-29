@@ -3,7 +3,7 @@
 **Header:** `libdes_event.hpp`
 **Inherits:** `des::object`
 
-An `event` represents a single discrete occurrence in the simulation. It carries a scheduled time, an event class, an optional constraint, and an open-ended key-value info map for user-defined metadata.
+An `event` represents a single discrete occurrence in the simulation. It carries a scheduled time, an event class, an optional constraint, and open-ended info fields for user-defined metadata, stored by [tag](tags.md).
 
 ---
 
@@ -12,7 +12,7 @@ An `event` represents a single discrete occurrence in the simulation. It carries
 ```cpp
 event();
 event(int cls);
-event(int cls, std::unordered_map<std::string, double> info);
+event(int cls, const std::vector<std::pair<tag, double>>& info);
 ```
 
 | Parameter | Description |
@@ -56,32 +56,33 @@ An optional constraint value. The boolean reports whether the constraint key is 
 
 ---
 
-## Info Map
+## Info Fields
 
-The info map stores arbitrary `double` values keyed by string. Standard keys are defined in [`libdes_const.hpp`](constants.md).
+Info fields hold `double` values addressed by [tag](tags.md): the library's fields are defined in [`libdes_const.hpp`](constants.md) (e.g. `EVENT_NODE`), user fields are defined once with `des::tag_registry::define()`.
 
 ```cpp
-bool set_info(std::string name, double val);  // false if the key already exists
-std::pair<bool,double> get_info(std::string name) const;
-void   emplace_info(std::string name, double val);  // replace existing
-void   remove_info(std::string name);
-std::unordered_map<std::string, double> get_map_info();
+bool set_info(tag t, double val);                       // false if the field already holds a value
+std::pair<bool,double> get_info(tag t) const;
+void emplace_info(tag t, double val);                    // replace existing
+void remove_info(tag t);
+const tag_store& get_store() const;                      // e.g. for des::message::view_of()
 ```
 
 The important info key used by the network is `EVENT_NODE`, which holds the index of the node that currently owns the event.
-`EVENT_TIME` and `EVENT_CONSTRAINT` are protected from `set_info()`; use `set_time()` and `set_constraint()` for those keys.
+`EVENT_TIME` and `EVENT_CONSTRAINT` are protected from `set_info()`, `emplace_info()` and `remove_info()`; use `set_time()` and `set_constraint()` for those keys.
 
 ---
 
 ## Cloning and Reset
 
 ```cpp
-void clone(event e);
-void reset(double time, std::vector<std::string> keys, bool newrun);
+void clone(const event& e);
+void shift_times(double time, const std::vector<tag>& keys);
+void reset(double time, std::vector<tag> keys, bool newrun);
 void clear();
 ```
 
-`reset()` subtracts the elapsed `time` from the scheduled event time, clamps negative results to `0`, and applies the same shift to any info keys listed in `keys`.
+`shift_times()` subtracts the elapsed `time` from the scheduled event time, clamps negative results to `0`, and applies the same shift to the fields listed in `keys`. `reset()` does the same.
 
 ---
 

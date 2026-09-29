@@ -4,9 +4,9 @@
 #include <iostream>
 #include <string>
 #include <utility>
-#include <unordered_map>
 
 #include "libdes_const.hpp"
+#include "libdes_tag.hpp"
 
 using namespace std;
 
@@ -15,145 +15,128 @@ namespace des
 	class message;
 }
 
-class des::message 
+/**
+ * @brief Fields delivered to observers, addressed by des::tag.
+ */
+class des::message
 {
     public:
         /**
-         * @brief Construct a new message object
-         * 
+         * @brief Construct an empty message
+         *
          */
         message(){}
         /**
-         * @brief Construct a new message object
-         * 
-         * @param kv 
+         * @brief Construct a message reading the fields of @p s without copying them
+         *
+         * @p s must outlive the message. Copies of the message own their data, and adding or
+         * removing a field makes the message take its own copy first.
+         *
+         * @param s
          */
-        message(unordered_map<string, double> kv)
+        static message view_of(const tag_store& s)
         {
-            key_value = kv;
+            // Returning a prvalue guarantees no copy, which would own the data
+            return message(&s);
         }
-        message(string m)
+        message(const message& other) : fields(other.data()), view(nullptr)
+        {}
+        message& operator=(const message& other)
         {
-            deserialize(m);
+            if(this != &other)
+            {
+                fields = other.data();
+                view = nullptr;
+            }
+            return *this;
         }
         /**
          * @brief Destroy the message object
-         * 
+         *
          */
         ~message(){}
         /**
-         * @brief add a key-value pair to the message 
-         * 
-         * @param key 
-         * @param value 
+         * @brief add a field to the message, replacing any previous value
+         *
+         * @param t
+         * @param value
          */
-        inline void add(string key, double value)
+        inline void add(tag t, double value)
         {
-            key_value[key] = value;
+            own();
+            fields.set(t, value);
         }
         /**
-         * @brief add a key-value pair to the message, with a default value equal to zero 
-         * 
-         * @param key 
-         * @param value 
+         * @brief Returns the value of field @p t, or 0 if the message does not hold it
+         *
+         * @param t
+         * @return double
          */
-        inline void add(string key)
+        inline double get_value(tag t) const
         {
-            key_value[key] = 0;
+            return data().value(t);
         }
         /**
-         * @brief Get the value object
-         * 
-         * @param key 
-         * @return double 
+         * @brief Tells whether the message holds field @p t
          */
-        inline double get_value(const string& key) const
+        inline bool has(tag t) const
         {
-            unordered_map<string,double>::const_iterator it = key_value.find(key);
-            if(it != key_value.end())
-            {
-                return it -> second;
-            }
-            return 0;
+            return data().has(t);
         }
         /**
-         * @brief set key_value object
-         * 
-         * @param um 
+         * @brief Removes field @p t
+         *
+         * @param t
          */
-        inline void set_keyvalue(unordered_map<string, double> um)
+        inline void remove(tag t)
         {
-            key_value = um;
+            own();
+            fields.remove(t);
         }
         /**
-         * @brief Removes a key-value pair
-         * 
-         * @param key 
-         */
-        inline void remove(string key)
-        {
-            unordered_map<string, double>::iterator element = key_value.find(key);
-            if(element != key_value.end())
-            {
-                key_value.erase(element);
-            }
-        }
-        /**
-         * @brief Serializes the message to string
-         * 
-         * @return string 
+         * @brief Serializes the message to string, e.g. for logging: fields are written as
+         * name MESSAGE_KEYVALUE_SEPARATOR value MESSAGE_PAIR_SEPARATOR, named after des::tag_registry
+         *
+         * @return string
          */
         inline string serialize() const
         {
-            unordered_map<string, double>::const_iterator it = key_value.begin();
             string message = "";
-            while(it != key_value.end())
+            data().for_each([&message](tag t, double v)
             {
-                message += it -> first + MESSAGE_KEYVALUE_SEPARATOR + to_string(it -> second) + MESSAGE_PAIR_SEPARATOR;
-                ++it;
-            }
+                message += tag_registry::name(t) + MESSAGE_KEYVALUE_SEPARATOR + to_string(v) + MESSAGE_PAIR_SEPARATOR;
+            });
             return message;
         }
-        /**
-         * @brief Deserializes  a message from string
-         * 
-         * @param msg 
-         */
-        inline void deserialize(string msg)
-        {
-            size_t kv_start = 0, kv_end = 0, kv_sep = 0,length = 0;
-            key_value.clear();
-			// Read pairs
-			length = msg.length();
-			do
-			{
-                string k;
-                double v;
-                kv_sep = msg.find(MESSAGE_KEYVALUE_SEPARATOR, kv_start);
-                kv_end = msg.find(MESSAGE_PAIR_SEPARATOR, kv_start);
-                if(kv_end == string::npos)
-                {
-                    kv_end = length;
-                }
-                // There is only the key
-                if(kv_sep == string::npos)
-                {
-                    k = msg.substr(kv_start, kv_end-kv_start);
-                    v = 0.0;
-                }
-                // There are both key and value
-                else
-                {
-                    k = msg.substr(kv_start, kv_sep-kv_start);
-                    v = stod(msg.substr(kv_sep+1, kv_end-kv_sep-1));
-                }
-                key_value.emplace(k,v);
-                kv_start = kv_end+1;
-			}
-			while(kv_end != length);
-
-        }
     protected:
-        unordered_map<string, double> key_value;
+        /**
+         * @brief The fields the message reads: the viewed store, if any, or its own
+         *
+         */
+        inline const tag_store& data() const
+        {
+            return view != nullptr ? *view : fields;
+        }
+        /**
+         * @brief Replace the view, if any, with an owned copy of the viewed fields
+         *
+         */
+        inline void own()
+        {
+            if(view != nullptr)
+            {
+                fields = *view;
+                view = nullptr;
+            }
+        }
+        tag_store fields;
+        /**
+         * @brief Store read without copying when the message was built by view_of(), nullptr otherwise
+         *
+         */
+        const tag_store* view = nullptr;
+    private:
+        explicit message(const tag_store* s) : fields(), view(s)
+        {}
 };
 #endif

@@ -3,8 +3,11 @@
 
 #include <iostream>
 #include <sstream>
+#include <atomic>
 #include <string>
 #include <vector>
+
+#include "libdes_tag.hpp"
 
 // #include <experimental/source_location>
 
@@ -105,14 +108,14 @@ class des::object{
          * 
          * @param param 
          */
-        virtual void reset(double, vector<string> = vector<string>(), bool = false)
+        virtual void reset(double, vector<des::tag> = vector<des::tag>(), bool = false)
         {}
         /**
          * @brief Resets the state of the object to param
          * 
          * @param param 
          */
-        virtual void reset(vector<string> = vector<string>(), bool = false)
+        virtual void reset(vector<des::tag> = vector<des::tag>(), bool = false)
         {}
         /**
          * @brief Resets the current state of the object to the initial state
