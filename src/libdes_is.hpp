@@ -1,7 +1,6 @@
 #ifndef IS_H
 #define IS_H
 
-#include <list>
 #include <memory>
 
 #include "libdes_event.hpp"
@@ -14,51 +13,25 @@ namespace des
 	class is;
 }
 
+/**
+ * @brief Infinite server discipline: every job is admitted, regardless of the configured
+ * capacity, and jobs are released in order of completion time.
+ */
 class des::is : public des::policy
 {
 	public:
 		/**
 		 * @brief Construct a new Infinite Servre (is) object
-		 * 
+		 *
 		 */
 		is();
 		/**
-		 * @brief 
-		 * 
-		 * @param e 
-		 * @param l 
-		 * @param positions 
-		 * @param rate 
-		 * @return true 
-		 * @return false 
+		 * @brief Stores the jobs in a heap ordered by completion time
 		 */
-		bool update(shared_ptr<event> e, list<shared_ptr<event>>& l, unsigned int positions, double rate) override;
+		unique_ptr<job_store> make_store() const override;
 		/**
-		 * @brief 
-		 * 
-		 * @param e 
-		 * @param l 
-		 * @param positions 
-		 * @return true 
-		 * @return false 
+		 * @brief Always admits
 		 */
-		bool update(shared_ptr<event> e, list<shared_ptr<event>>& l, unsigned int positions) override;
-		/**
-		 * @brief 
-		 * 
-		 * @param e 
-		 * @param l 
-		 * @param rate 
-		 * @return true 
-		 * @return false 
-		 */
-		bool update(shared_ptr<event> e, list<shared_ptr<event>>& l, double rate) override;
-		/**
-		 * @brief 
-		 * 
-		 * @return true 
-		 * @return false 
-		 */
-		bool front() override;
+		bool admit(const event& e, const job_store& jobs, unsigned int positions) const override;
 };
 #endif

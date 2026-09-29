@@ -1,7 +1,6 @@
 #ifndef FIFO_H
 #define FIFO_H
 
-#include <list>
 #include <memory>
 
 #include "libdes_event.hpp"
@@ -14,13 +13,16 @@ namespace des
 	class fifo;
 }
 
+/**
+ * @brief First-in first-out discipline: jobs are released in time order, ties in arrival order.
+ *
+ * In a waiting queue a job's time is its arrival time; in a server it is its completion
+ * time, so a multi-place server releases jobs as they complete.
+ */
 class des::fifo : public des::policy
 {
 	public:
 		fifo();
-		bool update(shared_ptr<event> e, list<shared_ptr<event>>& l, unsigned int positions, double rate) override;
-		bool update(shared_ptr<event> e, list<shared_ptr<event>>& l, unsigned int positions) override;
-		bool update(shared_ptr<event> e, list<shared_ptr<event>>& l, double rate) override;
-		bool front() override;
+		unique_ptr<job_store> make_store() const override;
 };
 #endif

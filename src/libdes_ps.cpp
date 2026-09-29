@@ -1,91 +1,164 @@
 #include "libdes_ps.hpp"
 
+#include <algorithm>
+#include <cmath>
+#include <stdexcept>
+
 namespace des {
 
 ps::ps() : policy("des::ps"), w()
 {}
 
 ps::ps(vector<double> weights) : policy("des::ps"), w(std::move(weights))
+{
+    for(double x : w)
+    {
+        if(!(x > 0.0) || !std::isfinite(x))
+            throw invalid_argument("des::ps: weights must be positive finite numbers");
+    }
+}
+
+unique_ptr<job_store> ps::make_store() const
+{
+    return make_unique<ps_store>(w);
+}
+
+ps_store::ps_store(vector<double> weights) : w(std::move(weights))
 {}
 
-double ps::get_weight(unsigned int cls) const
+double ps_store::weight(int cls) const
 {
-    if(cls < w.size())
+    if(cls >= 0 && static_cast<size_t>(cls) < w.size())
         return w[cls];
     return 1.0;
 }
 
-double ps::total_weight(const list<shared_ptr<event>>& l) const
+void ps_store::advance(double now)
 {
-    double W = 0.0;
-    for(const auto& ev : l)
-        W += get_weight(static_cast<unsigned int>(ev->get_cls()));
-    return W;
+    // V grows at rate 1/W while jobs are held, and stands still otherwise
+    if(total > 0.0)
+        vtime += (now - anchor) / total;
+    anchor = now;
 }
 
-bool ps::update(shared_ptr<event> e, list<shared_ptr<event>>& l, unsigned int positions, double time)
+void ps_store::count(int cls, long delta)
 {
-    if(l.size() >= positions)
-        return false;
+    size_t c = static_cast<size_t>(cls);
+    if(c >= in_class.size())
+        in_class.resize(c + 1, 0);
+    in_class[c] += delta;
+    // Recomputed from integer counts, so W never drifts
+    total = 0.0;
+    for(size_t k = 0; k < in_class.size(); k++)
+        total += in_class[k] * weight(static_cast<int>(k));
+}
 
-    double W     = total_weight(l);           // total weight before arrival
-    double w_new = get_weight(static_cast<unsigned int>(e->get_cls()));
-    double W_new = W + w_new;
+void ps_store::schedule_next()
+{
+    if(!jobs.empty())
+        jobs.front().job->set_time(departure(jobs.front()));
+}
 
-    // Rescale existing jobs: d_j' = time + (d_j - time) * W_new / W
-    // The scale factor W_new/W is class-independent → sorted order preserved.
-    if(W > 0.0)
+void ps_store::push(const shared_ptr<event>& e, double now)
+{
+    advance(now);
+    int cls = e->get_cls();
+    // The node sets the time of an arriving job to now + its service requirement
+    double service = e->get_time() - now;
+    jobs.push_back(entry{vtime + service / weight(cls), seq++, e});
+    push_heap(jobs.begin(), jobs.end(), after);
+    count(cls, +1);
+    schedule_next();
+}
+
+const shared_ptr<event>& ps_store::next() const
+{
+    return jobs.front().job;
+}
+
+void ps_store::departed(const shared_ptr<event>& e, double now)
+{
+    count(e->get_cls(), -1);
+    e->set_time(now);
+    if(jobs.empty())
     {
-        double scale = W_new / W;
-        for(auto& ev : l)
-            ev->set_time(time + (ev->get_time() - time) * scale);
-    }
-
-    // The station sets e->get_time() = arrival_time + service_time_alone, so
-    // the equivalent remaining time for the new job is its raw service time.
-    double r_new = e->get_time() - time;
-    e->set_time(time + r_new * W_new / w_new);
-
-    return true;
-}
-
-bool ps::update(shared_ptr<event>, list<shared_ptr<event>>&, unsigned int)
-{
-    throw runtime_error("des::ps::update wrong function call: time parameter required for processor sharing policy");
-    return false;
-}
-
-bool ps::update(shared_ptr<event>, list<shared_ptr<event>>&, double)
-{
-    throw runtime_error("des::ps::update wrong function call: no rate parameter in ps class");
-    return false;
-}
-
-bool ps::front()
-{
-    return true;
-}
-
-void ps::on_dequeue(list<shared_ptr<event>>& l, double time)
-{
-    if(l.size() <= 1)
-        return; // nothing remains after this departure
-
-    // The departing job is the front element.
-    double W     = total_weight(l);           // total weight before departure
-    double w_dep = get_weight(static_cast<unsigned int>(l.front()->get_cls()));
-    double W_new = W - w_dep;
-
-    if(W_new <= 0.0)
+        // Busy period over: restart the virtual clock, so it never grows large
+        vtime = 0.0;
+        anchor = now;
+        seq = 0;
         return;
+    }
+    schedule_next();
+}
 
-    // Rescale remaining jobs (skip front — that is the departing one):
-    // d_j' = time + (d_j - time) * W_new / W
-    double scale = W_new / W;
-    auto it = l.begin();
-    ++it; // skip departing job
-    for(; it != l.end(); ++it)
-        (*it)->set_time(time + ((*it)->get_time() - time) * scale);
+shared_ptr<event> ps_store::pop(double now)
+{
+    advance(now);
+    pop_heap(jobs.begin(), jobs.end(), after);
+    shared_ptr<event> e = std::move(jobs.back().job);
+    jobs.pop_back();
+    departed(e, now);
+    return e;
+}
+
+shared_ptr<event> ps_store::pop_first(const function<bool(const event&)>& eligible, double now)
+{
+    advance(now);
+    // The heap is not sorted: look for the eligible job departing first among all of them
+    auto best = jobs.end();
+    for(auto it = jobs.begin(); it != jobs.end(); ++it)
+    {
+        if(eligible(*it->job) && (best == jobs.end() || after(*best, *it)))
+            best = it;
+    }
+    if(best == jobs.end())
+        return nullptr;
+    shared_ptr<event> e = std::move(best->job);
+    jobs.erase(best);
+    make_heap(jobs.begin(), jobs.end(), after);
+    departed(e, now);
+    return e;
+}
+
+bool ps_store::has(const function<bool(const event&)>& eligible) const
+{
+    return any_of(jobs.begin(), jobs.end(), [&eligible](const entry& en){ return eligible(*en.job); });
+}
+
+size_t ps_store::size() const
+{
+    return jobs.size();
+}
+
+void ps_store::for_each(const function<void(event&)>& f)
+{
+    for(entry& en : jobs)
+        en.job->set_time(departure(en));
+    for(entry& en : jobs)
+        f(*en.job);
+    if(jobs.empty())
+        return;
+    // Resume from the new times: V = 0 at the earliest one, and each tag such that the
+    // job departs at its new time while W stays the same
+    double t0 = jobs.front().job->get_time();
+    for(const entry& en : jobs)
+        t0 = min(t0, en.job->get_time());
+    vtime = 0.0;
+    anchor = t0;
+    for(entry& en : jobs)
+        en.finish = (en.job->get_time() - t0) / total;
+    make_heap(jobs.begin(), jobs.end(), after);
+    schedule_next();
+}
+
+void ps_store::clear()
+{
+    jobs.clear();
+    in_class.assign(in_class.size(), 0);
+    total = 0.0;
+    vtime = 0.0;
+    anchor = 0.0;
+    seq = 0;
 }
 
 } // namespace des

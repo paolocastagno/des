@@ -1,131 +1,88 @@
 #include "libdes_queue.hpp"
 
 namespace des{
-    queue::queue(unsigned int positions, shared_ptr<policy> pol) : object(id_gen++), 
+    queue::queue(unsigned int positions, shared_ptr<policy> pol) : object(id_gen++),
         pos(positions),
-        lst(),
-        p(pol)
-    {}
+        p(pol),
+        jobs()
+    {
+        if(p == nullptr)
+        {
+            throw invalid_argument("des::queue requires a policy");
+        }
+        jobs = p -> make_store();
+    }
 
-    queue::queue(int positions, shared_ptr<policy> pol) : object(id_gen++),
-        pos(static_cast<unsigned int>(positions)),
-        lst(),
-        p(pol)
+    queue::queue(int positions, shared_ptr<policy> pol) : queue(static_cast<unsigned int>(positions), pol)
     {}
 
     queue::queue(shared_ptr<policy> pol) : queue(numeric_limits<unsigned int>::max(),  pol)
     {}
 
-    void queue::insert(shared_ptr<event> e)
+    bool queue::enqueue(const shared_ptr<event>& e, double time)
     {
-        if(lst.empty() || *(e.get()) < *(lst.front().get()))
+        if(!p -> admit(*e, *jobs, pos))
         {
-            lst.insert(lst.begin(), e);
+            return false;
         }
-        else if(*(e.get()) >= *(lst.back().get()))
-        {
-            lst.insert(lst.end(), e);
-        }
-        else
-        {
-            list<shared_ptr<event>>::iterator it = lst.begin();
-            while(it !=lst.end() && *(it -> get()) < *(e.get()))
-            {
-                ++it;
-            }
-            lst.insert(it, e);
-        }
-    }
-
-    bool queue::enqueue(shared_ptr<event> e, double time)
-    {
-        bool ret = false;
-        if(p == nullptr)
-        {
-            throw runtime_error("des::queue trying to enqueue with empty policy");
-        }
-        // Update events' order in the queue
-        if(p -> update(e, lst, pos, time))
-        {
-            // Create a new list and merge the new element into the list 
-            insert(e);
-            ret = true;
-        }
-        return ret;
+        jobs -> push(e, time);
+        return true;
     }
 
     shared_ptr<event> queue::dequeue()
     {
-        if(lst.size() == 0)
+        if(jobs -> size() == 0)
         {
             throw runtime_error("des::queue trying to dequeue from an empty queue");
         }
-        shared_ptr<event> ret;
-        if(p -> front())
-        {
-            ret = lst.front();
-            lst.pop_front();
-        }
-        else
-        {
-            ret = lst.back();
-            lst.pop_back();
-        }
-        return ret;
+        return jobs -> pop(min_time());
     }
 
     shared_ptr<event> queue::dequeue(double time)
     {
-        if(lst.size() == 0)
+        if(jobs -> size() == 0)
         {
             throw runtime_error("des::queue trying to dequeue from an empty queue");
         }
-        // Notify the policy before popping so it can update remaining events.
-        // For policies that do not override on_dequeue this is a no-op.
-        p->on_dequeue(lst, time);
-        shared_ptr<event> ret;
-        if(p -> front())
-        {
-            ret = lst.front();
-            lst.pop_front();
-        }
-        else
-        {
-            ret = lst.back();
-            lst.pop_back();
-        }
-        return ret;
+        return jobs -> pop(time);
+    }
+
+    shared_ptr<event> queue::dequeue_next(const function<bool(const event&)>& eligible, double time)
+    {
+        return jobs -> pop_first(eligible, time);
+    }
+
+    bool queue::has_next(const function<bool(const event&)>& eligible) const
+    {
+        return jobs -> has(eligible);
     }
 
     double queue::min_time() const
     {
-        if(lst.size() > 0)
-            return lst.front() -> get_time();
+        if(jobs -> size() > 0)
+            return jobs -> next() -> get_time();
         else
             return __DBL_MAX__;
     }
 
     bool queue::is_full() const
     {
-        return lst.size() < pos? false : true;
+        return jobs -> size() >= pos;
     }
 
     int queue::in_queue() const
     {
-        return lst.size();
+        return static_cast<int>(jobs -> size());
     }
 
-    void queue::reset(double time, vector<string> keys, bool)
+    void queue::reset(double time, vector<tag> keys, bool)
     {
-        for(auto it = lst.begin(); it != lst.end(); it++)
-        {
-            (*it) -> reset(time, keys);
-        }
+        jobs -> for_each([time, &keys](event& e){ e.shift_times(time, keys); });
     }
 
     void queue::clear()
     {
-        lst.clear();
+        jobs -> clear();
     }
 
     int queue::get_positions() const
@@ -145,7 +102,12 @@ namespace des{
 
     void queue::set_policy(policy *pol)
     {
+        if(jobs -> size() != 0)
+        {
+            throw logic_error("des::queue::set_policy called on a non-empty queue");
+        }
         p = shared_ptr<policy>(pol);
+        jobs = p -> make_store();
     }
 
     string queue::to_string() const{

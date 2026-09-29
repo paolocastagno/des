@@ -1,19 +1,20 @@
 #ifndef PS_H
 #define PS_H
 
-#include <list>
 #include <memory>
 #include <utility>
 #include <vector>
 
 #include "libdes_event.hpp"
 #include "libdes_policy.hpp"
+#include "libdes_store.hpp"
 
 using namespace std;
 
 namespace des
 {
 	class ps;
+	class ps_store;
 }
 
 /**
@@ -24,27 +25,7 @@ namespace des
  * jobs currently in service, a job of class c is served at rate w_c / W.
  * When all weights are equal (default) this reduces to standard PS.
  *
- * ### Invariant
- * For every job j of class c_j present at time t (n jobs, total weight W):
- *
- *   event_time(j) = t + r_j * W / w_{c_j}
- *
- * where r_j is the *equivalent remaining service time* — the remaining work
- * job j would need if it were alone.
- *
- * ### On arrival of class c_new (weight w_new), service time s_new:
- *   W' = W + w_new
- *   - For every existing job j:  d_j'  = t + (d_j  - t) * W' / W
- *   - For the new job:           d_new = t + s_new  * W' / w_new
- *
- *   The scale factor W'/W is class-independent, so the sorted order of
- *   existing jobs is preserved and no list reordering is triggered.
- *
- * ### On departure of class c_dep (weight w_dep) — via on_dequeue():
- *   W' = W - w_dep
- *   - For every remaining job j: d_j' = t + (d_j - t) * W' / W
- *
- *   Again class-independent — sorted order preserved.
+ * The jobs are held by a des::ps_store.
  *
  * ### Usage
  * Attach this policy to the *server* queue of a station with unlimited
@@ -66,33 +47,95 @@ class des::ps : public des::policy
 		 *
 		 * @param weights  weights[c] > 0 is the weight for class c.
 		 *                 Classes with index >= weights.size() default to 1.
+		 * @throws invalid_argument if a weight is not a positive finite number
 		 */
 		explicit ps(vector<double> weights);
-
 		/**
-		 * @brief Admits the job and rescales all departure times for the new
-		 *        total weight.  Returns false only when the server is full.
+		 * @brief Creates a des::ps_store with this policy's weights
 		 */
-		bool update(shared_ptr<event> e, list<shared_ptr<event>>& l, unsigned int positions, double time) override;
-		bool update(shared_ptr<event> e, list<shared_ptr<event>>& l, unsigned int positions) override;
-		bool update(shared_ptr<event> e, list<shared_ptr<event>>& l, double rate) override;
-
-		/** Always dequeues from the front (smallest departure time). */
-		bool front() override;
-
-		/**
-		 * @brief Rescales remaining jobs' departure times after a departure.
-		 *        Called by queue::dequeue(time) *before* the front is removed.
-		 */
-		void on_dequeue(list<shared_ptr<event>>& l, double time) override;
+		unique_ptr<job_store> make_store() const override;
 
 	private:
 		vector<double> w; ///< per-class weights; empty means all weights = 1
+};
 
-		/** Returns the weight for class cls (defaults to 1 if not set). */
-		double get_weight(unsigned int cls) const;
+/**
+ * @brief Jobs sharing a processor, tracked in virtual time.
+ *
+ * The virtual time V advances at rate 1 / W(t), where W(t) is the total weight of the
+ * jobs held. A job of class c arriving at time a with service requirement s receives
+ * the virtual finish tag
+ *
+ *   F = V(a) + s / w_c
+ *
+ * and departs when V reaches F. Tags never change, so jobs are kept in a heap ordered
+ * by F: arrivals and departures cost O(log n) and no departure time is ever rescaled,
+ * so no rounding error accumulates. Between two events W is constant, and the next
+ * departure happens at
+ *
+ *   t = t_V + (F_min - V) * W
+ *
+ * where t_V is the real time at which V was last updated. Only the next job's event
+ * time is kept up to date; the other jobs' times are brought up to date by for_each().
+ *
+ * The time of a job pushed at time now must be now + its service requirement when
+ * served alone, as set by des::node.
+ */
+class des::ps_store : public des::job_store
+{
+	public:
+		/**
+		 * @param weights  weights[c] > 0 is the weight for class c; classes beyond the vector size weigh 1
+		 */
+		explicit ps_store(vector<double> weights);
+		void push(const shared_ptr<event>& e, double now) override;
+		const shared_ptr<event>& next() const override;
+		shared_ptr<event> pop(double now) override;
+		shared_ptr<event> pop_first(const function<bool(const event&)>& eligible, double now) override;
+		bool has(const function<bool(const event&)>& eligible) const override;
+		size_t size() const override;
+		/**
+		 * @brief Brings every job's time up to date, calls @p f on each job, then resumes
+		 * from the times @p f left (each job keeps departing at its new time unless the
+		 * jobs held change).
+		 */
+		void for_each(const function<void(event&)>& f) override;
+		void clear() override;
 
-		/** Returns the total weight of all jobs currently in the list. */
-		double total_weight(const list<shared_ptr<event>>& l) const;
+	private:
+		struct entry
+		{
+			double finish;            ///< virtual finish tag F
+			unsigned long long seq;   ///< arrival order, breaks ties between equal tags
+			shared_ptr<event> job;
+		};
+		vector<entry> jobs;              ///< heap: jobs[0] departs next
+		vector<double> w;                ///< per-class weights; empty means all weights = 1
+		vector<unsigned long> in_class;  ///< number of jobs held per class
+		double total = 0.0;              ///< W: total weight of the jobs held
+		double vtime = 0.0;              ///< V at real time `anchor`
+		double anchor = 0.0;             ///< real time of the last update of `vtime`
+		unsigned long long seq = 0;
+
+		/** Heap order: tells whether @p a departs after @p b. */
+		static inline bool after(const entry& a, const entry& b)
+		{
+			return a.finish > b.finish || (a.finish == b.finish && a.seq > b.seq);
+		}
+		/** Returns the weight of class @p cls (defaults to 1 if it has none). */
+		double weight(int cls) const;
+		/** Advances the virtual time to real time @p now. */
+		void advance(double now);
+		/** Adds @p delta jobs of class @p cls and recomputes W from the per-class counts. */
+		void count(int cls, long delta);
+		/** Returns the real departure time of @p en if the jobs held do not change. */
+		inline double departure(const entry& en) const
+		{
+			return anchor + (en.finish - vtime) * total;
+		}
+		/** Sets the next job's event time to its departure time. */
+		void schedule_next();
+		/** Bookkeeping after job @p e left at time @p now. */
+		void departed(const shared_ptr<event>& e, double now);
 };
 #endif

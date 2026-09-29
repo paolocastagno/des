@@ -2,11 +2,11 @@
 #define POLICY_H
 
 #include <string>
-#include <list>
 #include <memory>
 
 #include "libdes_object.hpp"
 #include "libdes_event.hpp"
+#include "libdes_store.hpp"
 
 
 using namespace std;
@@ -16,6 +16,13 @@ namespace des
 	class policy;
 }
 
+/**
+ * @brief Queueing discipline of a des::queue.
+ *
+ * A policy decides which jobs a queue admits (admit()) and how the admitted jobs are
+ * stored and released (make_store()). A policy may be shared by several queues: each
+ * queue asks it for its own store when it is built, so the policy itself holds no jobs.
+ */
 class des::policy : public des::object
 {
 	public:
@@ -23,19 +30,18 @@ class des::policy : public des::object
 		{
 			description = d;
 		}
-		virtual bool update(shared_ptr<event> e, list<shared_ptr<event>>& l, unsigned int positions, double time)=0;
-		virtual bool update(shared_ptr<event> e, list<shared_ptr<event>>& l, unsigned int positions)=0;
-		virtual bool update(shared_ptr<event> e, list<shared_ptr<event>>& l, double time)=0;
-		virtual bool front()=0;
 		/**
-		 * @brief Called by queue::dequeue(time) before popping the front/back element.
-		 *        Policies that need to update remaining events on departure (e.g. processor sharing)
-		 *        override this. The default is a no-op so existing policies are unaffected.
-		 *
-		 * @param l   the full list of events still in the queue (including the one about to leave)
-		 * @param time current simulation time (= departure time of the leaving job)
+		 * @brief Creates the store holding the jobs of one queue that uses this policy
 		 */
-		virtual void on_dequeue(list<shared_ptr<event>>&, double) {}
+		virtual unique_ptr<job_store> make_store() const = 0;
+		/**
+		 * @brief Tells whether a queue with @p positions places, currently holding @p jobs,
+		 * admits job @p e. By default a job is admitted while there is a free place.
+		 */
+		virtual bool admit(const event&, const job_store& jobs, unsigned int positions) const
+		{
+			return jobs.size() < positions;
+		}
 		inline string get_description() const
 		{
 			return description;
@@ -52,13 +58,13 @@ class des::policy : public des::object
 			string s = "\tdes::policy (" + std::to_string(get_id()) + ")\t" + description + "\n";
 			return s;
 		}
-		
+
 		virtual inline void clear() override
 		{}
 
 	private:
 		string description;
-		inline static unsigned int id_gen = 0;
+		inline static atomic<unsigned int> id_gen{0};
 };
 
 

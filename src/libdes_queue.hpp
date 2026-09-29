@@ -1,14 +1,15 @@
 #ifndef QUEUE_H
 #define QUEUE_H
 
-#include <list> 
-#include <memory>
 #include <algorithm>
+#include <functional>
+#include <memory>
 #include <limits>
 
 #include "libdes_object.hpp"
 #include "libdes_event.hpp"
 #include "libdes_policy.hpp"
+#include "libdes_store.hpp"
 
 using namespace std;
 
@@ -17,40 +18,43 @@ namespace des
 	class queue;
 }
 
+/**
+ * @brief A bounded set of jobs, admitted and released according to a des::policy.
+ *
+ * The jobs are held by a des::job_store created by the policy, so the queue does not
+ * depend on how a discipline stores or orders them.
+ */
 class des::queue : public des::object
 {
 	friend class node;
 	template <typename , template <typename> typename> friend class station;
     public:
-        // /**
-		//  * @brief Creates a new empty queue object
-		//  */
-        queue();
         /**
-		 * @brief Creates a new queue object
-		 * 
-		 * @param positions queue size
-         * @param p policy employed to handle te queue
-		 * 
+		 * @brief Creates a new queue object with unlimited positions
+		 *
+         * @param pol policy employed to handle the queue
+		 * @throws invalid_argument if @p pol is null
 		 */
         queue(shared_ptr<policy> pol);
         /**
 		 * @brief Creates a new queue object
-		 * 
-		 * @param p policy employed to handle the queue
-		 * 
+		 *
+		 * @param positions queue size
+		 * @param pol policy employed to handle the queue
+		 * @throws invalid_argument if @p pol is null
 		 */
         queue(int positions, shared_ptr<policy> pol);
 		/**
 		 * @brief Creates a new queue object
-		 * 
-		 * @param p policy employed to handle the queue
-		 * 
+		 *
+		 * @param positions queue size
+		 * @param pol policy employed to handle the queue
+		 * @throws invalid_argument if @p pol is null
 		 */
         queue(unsigned int positions, shared_ptr<policy> pol);
 		/**
 		 * @brief Destroy the queue object
-		 * 
+		 *
 		 */
         ~queue(){}
 		/**
@@ -58,108 +62,113 @@ class des::queue : public des::object
 		 */
 		inline int size() const
 		{
-			return static_cast<int>(lst.size());
+			return static_cast<int>(jobs -> size());
 		}
 		/**
-		 * @brief 
-		 * 
-		 * @return string 
+		 * @brief
+		 *
+		 * @return string
 		 */
 		string to_string() const override;
 	private:
-        // Handle insertions and deletions
-        bool enqueue(shared_ptr<event> e, double time);
         /**
-		 * @brief Dequeues one job
+		 * @brief Adds job @p e at time @p time, if the policy admits it
+		 *
+		 * @return true if the job was admitted
+		 */
+        bool enqueue(const shared_ptr<event>& e, double time);
+        /**
+		 * @brief Dequeues the job released next
 		 *
          * @return the dequeued job
 		 *
 		 */
         shared_ptr<event> dequeue();
         /**
-		 * @brief Dequeues one job, notifying the policy of the current time before popping.
-		 *        This allows time-aware policies (e.g. processor sharing) to update the
-		 *        remaining departure times of the jobs that stay in the queue.
+		 * @brief Dequeues the job released next at time @p time. Time-aware stores (e.g.
+		 *        processor sharing) update the jobs that stay in the queue.
 		 *
 		 * @param time current simulation time (departure time of the leaving job)
          * @return the dequeued job
 		 */
         shared_ptr<event> dequeue(double time);
+        /**
+		 * @brief Dequeues the first job, in release order, satisfying @p eligible
+		 *
+		 * @param eligible predicate on the job
+		 * @param time current simulation time
+         * @return the dequeued job, or nullptr if no job qualifies
+		 */
+        shared_ptr<event> dequeue_next(const function<bool(const event&)>& eligible, double time);
+        /**
+		 * @brief Inspects whether the queue holds a job satisfying @p eligible
+		 */
+        bool has_next(const function<bool(const event&)>& eligible) const;
         // Utility methods
         /**
-        * @brief Returns the minimum time at which an event has happened
+        * @brief Returns the time of the job released next
         *
-        * @return minimum time
+        * @return its time, or __DBL_MAX__ if the queue is empty
         */
         double min_time() const;
-		/**
-		 * @brief Inserts an element in the list in increasing order
-		 * 
-		 * @param e 
-		 */
-		void insert(shared_ptr<event> e);
         /**
 		 * @brief Inspects whether the queue is full or not
-		 * 
+		 *
 		 * @return whether the queue is full or not
-		 * 
+		 *
 		 */
         bool is_full() const;
         /**
 		 * @brief Inspects the number of places in use
-		 * 
+		 *
 		 * @return the number of places in use
-		 * 
+		 *
 		 */
         int in_queue() const;
         /**
-		 * @brief reset the events' happening time according to a modification of the global time 
-		 * 
+		 * @brief reset the events' happening time according to a modification of the global time
+		 *
 		 * @param delta time to add all events happening time
-		 * 
+		 *
 		 */
-        void reset(double time, vector<string> keys = vector<string>(), bool newrun = false) override;
+        void reset(double time, vector<tag> keys = vector<tag>(), bool newrun = false) override;
         /**
-		 * @brief removes all elmeents in the queue and clears them
-		 * 
-		 * @param empty structure to host empty events, or nullptr
-		 * 
+		 * @brief removes all elmeents in the queue
+		 *
 		 */
         void clear() override;
         // Get and Set methods
         /**
 		 * @brief Inspects the number of positions in the queue
-		 * 
+		 *
 		 */
         int get_positions() const;
         /**
 		 * @brief Sets the number of positions in the queue
          *
          * @param positions the number of positions
-         *
-         * @return the number of positions
-		 * 
+		 *
 		 */
-        void set_positions(int positions); 
+        void set_positions(int positions);
         /**
 		 * @brief Inspect the policy name
-		 * 
+		 *
          *
          * @return A string representing the policy name
 		 */
         string get_policy() const;
         /**
 		 * @brief Sets the policy to hanlde the queue
-		 * 
-         * @param p policy employed to handle the queue
-		 * 
+		 *
+         * @param pol policy employed to handle the queue
+		 * @throws logic_error if the queue is not empty
 		 */
         void set_policy(policy* pol);
 
         unsigned int pos;
-        list<shared_ptr<event>> lst;
         shared_ptr<policy> p;
-		inline static unsigned int id_gen = 0;
+        unique_ptr<job_store> jobs;
+		inline static atomic<unsigned int> id_gen{0};
 };
 
 #endif
