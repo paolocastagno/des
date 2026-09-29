@@ -38,18 +38,24 @@ This produces a shared library file:
 
 ## Compiling Your Program
 
-Add the path to the library headers to your include path and link against `libdes`:
-
-```sh
-g++ -std=c++23 -I/path/to/des/src -c myprogram.cpp
-g++ -o myprogram myprogram.o -L/path/to/des -ldes
-```
-
-If you installed the library system-wide via `make install`:
+If you installed the library system-wide via `make install`, the headers and the library are on the default search paths:
 
 ```sh
 g++ -std=c++23 -c myprogram.cpp
 g++ -o myprogram myprogram.o -ldes
+```
+
+To use the library from the build directory instead, add its headers to the include path, link against it, and record its directory for the runtime linker:
+
+```sh
+g++ -std=c++23 -I/path/to/des/src -c myprogram.cpp
+g++ -o myprogram myprogram.o -L/path/to/des -ldes -Wl,-rpath,/path/to/des
+```
+
+On macOS one more step is needed. `libdes.dylib` records its install location, `/usr/local/lib/libdes.dylib`, and the program looks for the library there. It then either fails to start or silently loads a previously installed, possibly older, copy. Make it search the rpath instead:
+
+```sh
+install_name_tool -change /usr/local/lib/libdes.dylib @rpath/libdes.dylib myprogram
 ```
 
 ## Minimal Example

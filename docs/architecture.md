@@ -4,17 +4,9 @@
 
 libdes models a simulation as a **network of autonomous nodes** connected by a probabilistic routing table. The simulation engine advances time by repeatedly asking the network for the next scheduled event, routing it to the appropriate node, and collecting measurements via attached observers.
 
-```
-┌──────────────────────────────────────────────────────────┐
-│                        des::network                       │
-│                                                          │
-│  ┌──────────┐   routing   ┌──────────┐   routing         │
-│  │  source  │ ──────────► │ station  │ ──────────► sink  │
-│  └──────────┘             └──────────┘                   │
-│       │                        │                         │
-│  observers                observers                      │
-└──────────────────────────────────────────────────────────┘
-```
+![libdes architecture: your program drives the event loop of a des::network made of a source, a station and a sink; every queue delegates to a policy and a job store; observers attached to node signals collect the statistics](../figures/architecture.svg)
+
+The numbered steps are one iteration of the [simulation loop](#simulation-loop). Dashed parts are extension points: queue policies and job stores, service-time distributions, routing and block handlers, and observers.
 
 ---
 

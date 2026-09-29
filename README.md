@@ -1,75 +1,189 @@
 # libdes
 
-### What is DES?
+**libdes** is a C++ library for discrete-event simulation of queueing networks. You describe a model as sources, service stations and sinks connected by a routing matrix. You attach observers to the quantities you want to measure and run independent replications. The library handles the event list, queues, service disciplines, routing and statistics, and returns confidence intervals for your estimates.
 
-The **Discrete Event Simulation (DES)** C++ library is a framework designed to simplify the creation and management of event-based simulators. The library abstracts many core simulation components—such as event handling, queue management, and data collection—allowing developers to focus on modeling the actual system rather than worrying about the underlying simulation mechanics.
+## Features
 
-### Key Features of DES:
+- **Queueing-network models.** Sources generate Poisson arrivals. Stations have any number of servers and waiting queues, with finite or unlimited capacity and service times drawn from any `<random>` distribution. Sinks absorb completed jobs.
+- **Multiple job classes.** Arrival rates, service distributions and routing probabilities are set per class.
+- **Queue disciplines.** FIFO, infinite server, processor sharing and weighted generalized processor sharing (GPS). A new discipline is a policy plus a job store, added without changing the library.
+- **Routing and blocking.** A probabilistic matrix `routing[from][to][class]` sets the default routes. Optional handlers choose destinations with custom logic, reroute jobs refused by a full node, and pick which waiting queue a free server serves next (e.g. strict priority). Refused and lost jobs are counted.
+- **Measurement.** Observers attach to node signals such as arrival and departure and read one event field: sojourn, waiting or service time, or a field you define. `scalar` keeps the mean and variance, `counter` counts events, `sample` stores every observation and `histogram` bins them. The network also tracks throughput and blocking on every edge, and losses at every node.
+- **Replications and confidence intervals.** `reset()` closes a run and keeps its statistics. Independent replications then give Student-t confidence intervals, and statistics collected during a warm-up period can be discarded.
+- **Reproducible and fast.** One seeded `std::mt19937_64` drives the whole model. Event fields are addressed by integer tags rather than strings, the next event comes from an indexed heap, and event objects are recycled.
 
-1. **Event Management**:
-   - DES efficiently handles **future event lists (FEL)**, which queue events scheduled to occur at future time points. These events drive the simulation forward, as the simulation engine processes them in time order.
+## How it works
 
-2. **Queue Management**:
-   - DES provides base implementations for:
-     - **Single and Multiple Server Queues**: Simulating systems with a limited or multiple number of service units (servers).
-     - **First-In, First-Out (FIFO) Policy**: A queue policy where the first entity to enter the queue is the first to be processed.
-     - **Infinite Server (IS) Queues**: Queues with an unlimited number of servers, where all arrivals are immediately served without delay.
-   - Users can easily define and implement their own queuing policies if the predefined ones don’t fit the simulation requirements.
+![libdes architecture: your program drives the event loop of a des::network made of a source, a station and a sink; every queue delegates to a policy and a job store; observers attached to node signals collect the statistics](figures/architecture.svg)
 
-3. **Modular Station Network**:
-   - A simulator built using DES is modeled as a **network of independent stations**. Each station maintains its own future event list (FEL), making it responsible for handling its events autonomously. 
-   - The **simulation engine** coordinates these stations by polling them for their next event and managing their interactions. This modularity allows for the design of highly flexible and complex simulation systems.
+Your program drives the simulation loop. `next_event()` asks the network's heap for the node whose next job completes first (1), and that job departs (2). `route()` samples the next node from the routing matrix (3) and hands the job over (4). The node starts it on a free server or puts it in a waiting queue. Each queue leaves admission and release order to its policy and the job store the policy creates. Observers attached to node signals collect the statistics. The dashed parts are the ones you can replace with your own. [Architecture](docs/architecture.md) covers the design in detail.
 
-4. **Customizability**:
-   - DES is designed with flexibility in mind, allowing users to create **custom queue policies, stations, and events**. This makes the library adaptable to a wide range of simulation scenarios.
+## Quick start
 
-### Components of the DES Library:
+### Requirements
 
-- **Event Handling**: Events are the basic unit of simulation and represent a change in the system’s state at a specific time. Each station processes its own events, and the simulator engine ensures these events occur in the correct order.
-  
-- **Queue Management**: Handling entities waiting for service, using either predefined or custom queueing rules. Multiple queue disciplines (like FIFO, infinite server) are provided out-of-the-box, with room for user-defined policies.
+- A C++23 compiler (C++20 also works with `make CXXSTD=c++20`)
+- GNU Make
+- macOS or Linux
 
-- **Simulator Engine**: Manages the progression of simulation time by polling each station for its next event, ensuring the simulation runs smoothly in a chronological manner.
+### Build and run the example
 
-- **Measurements and Metrics**: DES provides basic facilities for collecting metrics related to simulation performance, allowing users to analyze system behavior such as wait times, queue lengths, and service times.
+```sh
+git clone https://github.com/paolocastagno/des.git
+cd des
+make                          # builds libdes.dylib (macOS) or libdes.so (Linux)
+make test LINK_INSTALLED=0    # builds and runs test/test against the library just built
+```
 
-### Use Cases for DES:
+[`test/test.cpp`](test/test.cpp) simulates an M/M/1 and an M/M/2 queue over five replications. It prints confidence intervals for throughput and mean sojourn time next to the values from queueing theory. `make test` links against the installed library by default. `LINK_INSTALLED=0` uses the one in the working tree instead.
 
-- **Manufacturing Systems**: Simulate production lines with multiple stations, queues, and service times.
-- **Network Traffic Simulation**: Model data packets moving through network routers with queuing policies and service delays.
-- **Healthcare Systems**: Simulate patient flow through hospital departments, with waiting times, services, and resources being processed.
-- **Custom Simulation Models**: Due to its flexible nature, DES can be adapted for any event-driven system that needs simulation.
+### A first model
+
+An M/M/1 queue, with arrival rate 0.8 and service rate 1, simulated over five replications of 100 000 events:
+
+```cpp
+#include <climits>
+#include <iostream>
+#include <memory>
+#include <random>
+#include <vector>
+
+#include <libdes_const.hpp>
+#include <libdes_event.hpp>
+#include <libdes_network.hpp>
+#include <libdes_scalar.hpp>
+#include <libdes_sink.hpp>
+#include <libdes_source.hpp>
+#include <libdes_station.hpp>
+
+using namespace std;
+
+int main()
+{
+    auto gen = make_shared<mt19937_64>(42);   // one seeded RNG shared by all components
+
+    // Poisson arrivals (rate 0.8) -> one exponential server (rate 1) -> sink
+    auto src = make_shared<des::source>(vector<double>{0.8}, "Source", gen);
+    auto svc = make_shared<exponential_distribution<double>>(1.0);
+    auto sta = make_shared<des::station<double, exponential_distribution>>(
+        vector<vector<shared_ptr<exponential_distribution<double>>>>{{svc}},   // [server][class]
+        1, 1,          // 1 server, 1 job per server
+        1, INT_MAX,    // 1 waiting queue, unlimited capacity
+        "M/M/1", gen);
+    auto snk = make_shared<des::sink>("Sink");
+
+    // Measure the time jobs spend in the station
+    auto sojourn = make_shared<des::scalar>(NODE_SOJOURN, 1);
+    sta->attach(SIGNAL_NODE_DEPARTURE, sojourn);
+
+    // routing[from][to][class]: source -> station -> sink
+    vector<vector<vector<double>>> routing = {
+        {{0}, {1}, {0}},
+        {{0}, {0}, {1}},
+        {{0}, {0}, {0}}
+    };
+    des::network net({src, sta, snk}, routing, gen);
+
+    // Bootstrap: one event at the source, which then schedules every arrival
+    auto e = make_shared<des::event>();
+    e->set_cls(0);
+    e->set_time(0.0);
+    e->set_info(EVENT_NODE, 0);
+    src->arrival(e);
+
+    for (int run = 0; run < 5; ++run)          // 5 independent replications
+    {
+        double t = 0.0;
+        for (int i = 0; i < 100000; ++i)
+        {
+            e = net.next_event();              // globally earliest event
+            t = e->get_time();
+            net.route(e);                      // move it to its next node
+        }
+        net.reset(t, {}, true);                // close the run, keep its statistics
+    }
+
+    auto [thr_lo, thr_hi] = net.get_flow_ci(1, 2, 0, 0.05);
+    auto [soj_lo, soj_hi] = sojourn->confidence_interval(0.05, 0);
+    cout << "Throughput   95% CI [" << thr_lo << ", " << thr_hi << "]  (theory 0.8)\n"
+         << "Mean sojourn 95% CI [" << soj_lo << ", " << soj_hi << "]  (theory 5)\n";
+}
+```
+
+Output with Apple clang (other standard libraries draw different samples):
+
+```
+Throughput   95% CI [0.794513, 0.803676]  (theory 0.8)
+Mean sojourn 95% CI [4.69121, 5.30995]  (theory 5)
+```
+
+The [example walkthrough](docs/examples/basic-network.md) explains each step.
+
+## Using the library
+
+Install the headers and the library system-wide (uses `sudo`; installs to `/usr/local` on macOS and `/usr` on Linux), then compile against it:
+
+```sh
+make install
+g++ -std=c++23 myprogram.cpp -ldes -o myprogram
+```
+
+To use the library from the working tree instead, point the compiler and the runtime linker at it:
+
+```sh
+g++ -std=c++23 -I/path/to/des/src myprogram.cpp -L/path/to/des -ldes -Wl,-rpath,/path/to/des -o myprogram
+```
+
+On macOS, `libdes.dylib` records `/usr/local/lib` as its location. The program will load an installed copy from there, if one exists, until you redirect it:
+
+```sh
+install_name_tool -change /usr/local/lib/libdes.dylib @rpath/libdes.dylib myprogram
+```
+
+Common build targets:
+
+| Command | Effect |
+|---|---|
+| `make` | Release build (`-O3`) |
+| `make debug` | Clean debug build (`-O0 -g`) |
+| `make CXXSTD=c++20` | Build with another C++ standard |
+| `make test` | Build and run `test/test` (add `LINK_INSTALLED=0` for the working-tree library) |
+| `make check` / `make validate` | Unit and regression tests / validation against queueing theory |
+| `make check-sanitize` / `make coverage` / `make bench` | Tests under sanitizers / coverage report / benchmarks |
+| `make install` / `make uninstall` | Install or remove the headers and library system-wide |
+| `make clean` / `make clean-lib` | Remove object files / the compiled library |
+
+[Getting Started](docs/getting-started.md) lists all the build options, and the Makefile also has profiling targets (`make profile`). [Testing](docs/testing.md) describes the test pipeline and how to add tests.
 
 ## Documentation
 
-Full documentation is available in the [`docs/`](docs/README.md) folder:
+| Document | Contents |
+|---|---|
+| [Getting Started](docs/getting-started.md) | Building, compiling your program, a minimal example |
+| [Architecture](docs/architecture.md) | Class hierarchy, design patterns, the simulation loop, replications |
+| [API Reference](docs/api/README.md) | Every class, grouped by header |
+| [Example: M/M/1](docs/examples/basic-network.md) | Annotated walkthrough of `test/test.cpp` |
 
-- [Getting Started](docs/getting-started.md)
-- [Architecture](docs/architecture.md)
-- [API Reference](docs/api/README.md)
-- [Examples](docs/examples/basic-network.md)
+Topics you may want to read next:
 
-## Installation
+- [Writing a queue discipline](docs/api/queue.md#implementing-a-custom-policy): LIFO and priority examples
+- [Stations](docs/api/station.md): multi-server, processor sharing, GPS and class-priority stations
+- [Routing and blocking handlers](docs/api/network.md#custom-handlers)
+- [Tags](docs/api/tags.md): adding your own event fields and measuring them
 
-To compile the project, use the following commands:
+## Repository layout
 
-```sh
-make
+```
+src/     library sources; public headers are src/libdes_*.hpp
+test/    test.cpp: M/M/1 and M/M/2 models checked against queueing theory
+docs/    user guide and API reference
 ```
 
-Then link your program against the library:
+## Notes
 
-```sh
-g++ -std=c++20 -c prog.cpp
-g++ -o prog prog.o -ldes
-```
-
-## Usage
-
-1. **Include the necessary headers** in your source files.
-2. **Create and configure events, queues, and network nodes** as needed.
-3. **Run the simulation** and collect the results for analysis.
+- The library is not thread-safe. To run replications in parallel, use separate processes.
+- Sources generate exponential inter-arrival times (Poisson arrivals). Service times can follow any distribution.
 
 ## Contact
 
-For any questions or suggestions, please open an issue or contact the repository owner.
+Questions, bug reports and suggestions are welcome as [GitHub issues](https://github.com/paolocastagno/des/issues).
