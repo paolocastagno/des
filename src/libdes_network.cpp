@@ -10,34 +10,42 @@ namespace des
 		gen(g)
 		{
 			set_sid("Network");
-			// Initialaize function pointers to nullptr and the default functions will be used;
-			handle_block = nullptr;
-			handle_forks = nullptr;
+			// Function pointers default to nullptr and the default functions will be used;
+			max_reroute_attempts = max<unsigned int>(1, nodes.size());
 			for(unsigned int i = 0; i < routing.size(); i++)
 			{
-				vector<shared_ptr<counter>> cnt;
-				vector<shared_ptr<scalar>> flw;
+				// Events leaving node i may belong to any class routed on one of its edges
+				int node_cls = 1;
 				for(unsigned int j = 0; j < routing.at(i).size(); j++)
 				{
-					int cls = routing.at(i).at(0).size();
-					string nm = "_" + std::to_string(i) + "_" + std::to_string(j);
+					// Each edge tracks the classes listed in its own routing entry
+					int cls = routing.at(i).at(j).size();
+					node_cls = max(node_cls, cls);
+					string nm = edge(i, j);
 					observable_events.emplace(SIGNAL_NET_ROUTING+nm, list<shared_ptr<observer>>());
 					attach(SIGNAL_NET_ROUTING+nm, shared_ptr<counter>(new counter("count"+nm,cls)));
-					attach(SIGNAL_NET_ROUTING+nm, shared_ptr<scalar>(new scalar("flow"+nm,cls)));
+					observable_events.emplace(SIGNAL_NET_FLOW+nm, list<shared_ptr<observer>>());
+					attach(SIGNAL_NET_FLOW+nm, shared_ptr<scalar>(new scalar("flow"+nm,cls)));
+					observable_events.emplace(SIGNAL_NET_BLOCK+nm, list<shared_ptr<observer>>());
+					attach(SIGNAL_NET_BLOCK+nm, shared_ptr<counter>(new counter("blocked"+nm,cls)));
 				}
+				string nm = "_" + std::to_string(i);
+				observable_events.emplace(SIGNAL_NET_LOSS+nm, list<shared_ptr<observer>>());
+				attach(SIGNAL_NET_LOSS+nm, shared_ptr<counter>(new counter("lost"+nm,node_cls)));
 			}
+			index_signals();
 			init_heap();
 		}
 
 		network::network(vector<shared_ptr<node>> nds, vector<vector<vector<double>>> rtg,
-						int (*hffunc)(shared_ptr<event>, const vector<vector<vector<double>>>&, shared_ptr<mt19937_64>&),
+						int (*hffunc)(const shared_ptr<event>&, const vector<vector<vector<double>>>&, shared_ptr<mt19937_64>&),
 						shared_ptr<mt19937_64>& g) : network::network(nds, rtg, g)
 		{
 			handle_forks = hffunc;
 		}
 
 		network::network(vector<shared_ptr<node>> nds, vector<vector<vector<double>>> rtg,
-						pair<bool, int> (*hbfunc)(shared_ptr<event>, int,
+						pair<bool, int> (*hbfunc)(const shared_ptr<event>&, int,
 												const vector<vector<vector<double>>>&, shared_ptr<mt19937_64>&),
 						shared_ptr<mt19937_64>& g) : network::network(nds, rtg, g)
 		{
@@ -45,9 +53,9 @@ namespace des
 		}
 
 		network::network(vector<shared_ptr<node>> nds, vector<vector<vector<double>>> rtg,
-							int (*hffunc)(shared_ptr<event>, const vector<vector<vector<double>>>&,
+							int (*hffunc)(const shared_ptr<event>&, const vector<vector<vector<double>>>&,
 										shared_ptr<mt19937_64>&),
-							pair<bool, int> (*hbfunc)(shared_ptr<event>, int,
+							pair<bool, int> (*hbfunc)(const shared_ptr<event>&, int,
 							const vector<vector<vector<double>>>&, shared_ptr<mt19937_64>&),
 						shared_ptr<mt19937_64>& g) : network::network(nds, rtg, g)
 		{
@@ -55,27 +63,25 @@ namespace des
 			handle_block = hbfunc;
 		}
 
-		bool network::insert(shared_ptr<event> e, string ndesc)
+		bool network::insert(const shared_ptr<event>& e, string ndesc)
 		{
 			unsigned int i =0;
 			while(i < nodes.size() && nodes.at(i) -> get_sid() != ndesc)
 			{
 				++i;
 			}
-			if(nodes.at(i) -> get_sid() == ndesc)
+			if(i < nodes.size() && nodes.at(i) -> arrival(e))
 			{
-				return nodes.at(i) -> arrival(e);
+				update_heap(i);
+				return true;
 			}
-			else
-			{
-				return false;
-			}
+			return false;
 		}
 
-	// void network::handle_constraints(shared_ptr<event> e, const double& time)
+	// void network::handle_constraints(const shared_ptr<event>& e, const double& time)
 	// {
 	// 	bool keep_going = true;
-	// 	int node = static_cast<int>(e -> get_info(EVENT_CURRENT_NODE).second), cls = e -> get_cls();
+	// 	int node = static_cast<int>(e -> get_info(tags::EVENT_CURRENT_NODE).second), cls = e -> get_cls();
 	// 	vector<pair<shared_ptr<Constraint>, Handler>> node_cons = handler.at(node).at(cls);
 	// 	size_t i = 0;
 	// 	while(keep_going && i < node_cons.size())
@@ -102,55 +108,150 @@ namespace des
 			init_heap();
 			if(event_heap.empty()) return nullptr;
 		}
-		auto it = event_heap.begin();
-		int idx = it->second;
-		event_heap.erase(it);
-		node_heap_time[idx] = __DBL_MAX__;
+		int idx = event_heap.front();
 		shared_ptr<event> e = nodes.at(idx)->departure();
 		update_heap(idx);
+		now = e->get_time();
 		return e;
 	}
 
 	void network::init_heap()
 	{
 		event_heap.clear();
+		heap_pos.assign(nodes.size(), -1);
 		node_heap_time.assign(nodes.size(), __DBL_MAX__);
 		for(unsigned int i = 0; i < nodes.size(); i++)
 		{
-			node_heap_time[i] = nodes.at(i)->next_event_time();
-			if(has_pending_event(node_heap_time[i]))
+			double t = nodes.at(i)->next_event_time();
+			if(has_pending_event(t))
 			{
-				event_heap.emplace(node_heap_time[i], i);
+				node_heap_time[i] = t;
+				heap_pos[i] = static_cast<int>(event_heap.size());
+				event_heap.push_back(i);
 			}
+		}
+		for(size_t i = event_heap.size() / 2; i-- > 0;)
+		{
+			heap_sift_down(i);
 		}
 	}
 
 	void network::update_heap(int idx)
 	{
-		event_heap.erase({node_heap_time[idx], idx});
-		node_heap_time[idx] = nodes.at(idx)->next_event_time();
-		if(has_pending_event(node_heap_time[idx]))
+		double t = nodes.at(idx)->next_event_time();
+		int p = heap_pos[idx];
+		if(!has_pending_event(t))
 		{
-			event_heap.emplace(node_heap_time[idx], idx);
+			node_heap_time[idx] = __DBL_MAX__;
+			if(p >= 0)
+			{
+				// Replace the entry with the last one and restore the order around it
+				size_t last = event_heap.size() - 1;
+				if(static_cast<size_t>(p) != last)
+				{
+					heap_swap(p, last);
+				}
+				event_heap.pop_back();
+				heap_pos[idx] = -1;
+				if(static_cast<size_t>(p) < event_heap.size())
+				{
+					int moved = event_heap[p];
+					heap_sift_up(p);
+					heap_sift_down(heap_pos[moved]);
+				}
+			}
+			return;
+		}
+		node_heap_time[idx] = t;
+		if(p < 0)
+		{
+			heap_pos[idx] = static_cast<int>(event_heap.size());
+			event_heap.push_back(idx);
+			heap_sift_up(event_heap.size() - 1);
+		}
+		else
+		{
+			heap_sift_up(p);
+			heap_sift_down(heap_pos[idx]);
 		}
 	}
 
-	pair<bool, int> network::hbfunc(shared_ptr<event>, int, const vector<vector<vector<double>>>&, shared_ptr<mt19937_64>&)
+	void network::heap_sift_up(size_t i)
+	{
+		while(i > 0)
+		{
+			size_t parent = (i - 1) / 2;
+			if(!heap_less(event_heap[i], event_heap[parent]))
+			{
+				break;
+			}
+			heap_swap(i, parent);
+			i = parent;
+		}
+	}
+
+	void network::heap_sift_down(size_t i)
+	{
+		size_t n = event_heap.size();
+		while(true)
+		{
+			size_t smallest = i, l = 2 * i + 1, r = l + 1;
+			if(l < n && heap_less(event_heap[l], event_heap[smallest]))
+			{
+				smallest = l;
+			}
+			if(r < n && heap_less(event_heap[r], event_heap[smallest]))
+			{
+				smallest = r;
+			}
+			if(smallest == i)
+			{
+				break;
+			}
+			heap_swap(i, smallest);
+			i = smallest;
+		}
+	}
+
+	void network::index_signals()
+	{
+		edge_lists.assign(routing.size(), vector<edge_signals>());
+		loss_lists.assign(routing.size(), nullptr);
+		auto lookup = [this](const string& signal) -> list<shared_ptr<observer>>*
+		{
+			auto it = observable_events.find(signal);
+			return it == observable_events.end() ? nullptr : &(it -> second);
+		};
+		for(unsigned int i = 0; i < routing.size(); i++)
+		{
+			edge_lists[i].resize(routing.at(i).size());
+			for(unsigned int j = 0; j < routing.at(i).size(); j++)
+			{
+				edge_lists[i][j].route = lookup(SIGNAL_NET_ROUTING + edge(i, j));
+				edge_lists[i][j].block = lookup(SIGNAL_NET_BLOCK + edge(i, j));
+			}
+			loss_lists[i] = lookup(SIGNAL_NET_LOSS + "_" + std::to_string(i));
+		}
+		lists_owner = this;
+	}
+
+	pair<bool, int> network::hbfunc(const shared_ptr<event>&, int, const vector<vector<vector<double>>>&, shared_ptr<mt19937_64>&)
 	{
 		return make_pair<bool, int>(false, 0);
 	}
 	
-	int network::hffunc(shared_ptr<event> e, const vector<vector<vector<double>>>& route, shared_ptr<mt19937_64>& g)
+	int network::hffunc(const shared_ptr<event>& e, const vector<vector<vector<double>>>& route, shared_ptr<mt19937_64>& g)
 	{
 		uniform_real_distribution<double> dist;
 		int i = 0;
 		double rnd = dist(*g.get()), cum = 0.0;
-		vector<vector<double>> rtg_vec = route.at(e -> get_info(EVENT_NODE).second);
+		const vector<vector<double>>& rtg_vec = route.at(e -> get_info(tags::EVENT_NODE).second);
+		const int cls = e -> get_cls();
 		do
 		{
-			cum += rtg_vec.at(i).at(e -> get_cls());
+			cum += rtg_vec.at(i).at(cls);
 		}
-		while(cum < rnd && ++i < static_cast<int>(route.size()));
+		while(cum < rnd && ++i < static_cast<int>(rtg_vec.size()));
 		if(cum > rnd)
 		{
 			return i;
@@ -161,108 +262,138 @@ namespace des
 		}
 	}
 
-	void network::route(shared_ptr<event> e)
+	void network::notify_routing(const shared_ptr<event>& e, int source, int dest)
 	{
-		pair<bool, double> node = e -> get_info(EVENT_NODE);
+		if(lists_owner != this)
+		{
+			index_signals();
+		}
+		if(static_cast<unsigned int>(dest) >= edge_lists.at(source).size())
+		{
+			return;
+		}
+		list<shared_ptr<observer>>* obs = edge_lists[source][dest].route;
+		if(obs == nullptr || obs -> empty())
+		{
+			return;
+		}
+		message m = message::view_of(e -> get_store());
+		deliver(obs, m);
+	}
+
+	void network::notify_class(list<shared_ptr<observer>>* obs, int cls)
+	{
+		if(obs == nullptr || obs -> empty())
+		{
+			return;
+		}
+		message m;
+		m.add(tags::EVENT_CLS, cls);
+		deliver(obs, m);
+	}
+
+	bool network::try_arrival(const shared_ptr<event>& e, int source, int dest)
+	{
+		e -> emplace_info(tags::EVENT_NODE, dest);
+		if(nodes.at(dest) -> arrival(e))
+		{
+			notify_routing(e, source, dest);
+			// Event successfully enqueued; update the heap for the destination node
+			update_heap(dest);
+			return true;
+		}
+		e -> emplace_info(tags::EVENT_NODE, source);
+		if(lists_owner != this)
+		{
+			index_signals();
+		}
+		if(static_cast<unsigned int>(dest) < edge_lists.at(source).size())
+		{
+			notify_class(edge_lists[source][dest].block, e -> get_cls());
+		}
+		return false;
+	}
+
+	void network::route(const shared_ptr<event>& e)
+	{
+		pair<bool, double> node = e -> get_info(tags::EVENT_NODE);
 		if(!node.first)
 		{
 			throw runtime_error("network::route failed to recover the current node id\n");
 		}
+		int source = static_cast<int>(node.second);
+		int dest;
+		if(handle_forks != nullptr)
+		{
+			dest = handle_forks(e, routing, gen);
+		}
 		else
 		{
-			int source = static_cast<int>(node.second);
-			int dest;
-			if(handle_forks != nullptr)
+			dest = hffunc(e, routing, gen);
+		}
+		// A destination outside the routing row means the event leaves the network
+		if(dest < 0 || static_cast<unsigned int>(dest) >= routing.at(source).size())
+		{
+			return;
+		}
+		if(try_arrival(e, source, dest))
+		{
+			return;
+		}
+		// The destination is full: the block handler may reroute the event, a bounded number of times
+		e -> emplace_info(tags::EVENT_REJECT, 1.0);
+		int blocked = dest;
+		for(unsigned int attempt = 0; attempt < max_reroute_attempts; ++attempt)
+		{
+			pair<bool, int> reroute;
+			if(handle_block != nullptr)
 			{
-				dest = handle_forks(e, routing, gen);
+				reroute = handle_block(e, blocked, routing, gen);
 			}
 			else
 			{
-				dest = hffunc(e, routing, gen);
+				reroute = hbfunc(e, blocked, routing, gen);
 			}
-
-			if(dest > 0  && static_cast<unsigned int>(dest) < routing.at(source).size())
+			if(!reroute.first || reroute.second < 0 || static_cast<unsigned int>(reroute.second) >= nodes.size())
 			{
-				e -> emplace_info(EVENT_NODE, dest);
-				if(nodes.at(dest) -> arrival(e))
+				break;
+			}
+			if(try_arrival(e, source, reroute.second))
+			{
+				return;
+			}
+			blocked = reroute.second;
+		}
+		// No destination accepted the event: it is lost
+		if(lists_owner != this)
+		{
+			index_signals();
+		}
+		notify_class(loss_lists.at(source), e -> get_cls());
+	}
+
+	void network::reset(double time, vector<tag> keys, bool newrun)
+	{
+		// Close the run: each edge contributes its throughput N/T to the flow estimate
+		if(time > 0)
+		{
+			for(unsigned int i = 0; i < routing.size(); i++)
+			{
+				for(unsigned int j = 0; j < routing.at(i).size(); j++)
 				{
-					// Count the routing choice
-					string nm = "_" + std::to_string(source) + "_" + std::to_string(dest);
-					if(observers != 0)
+					counter* cnt = find_front<counter>(SIGNAL_NET_ROUTING + edge(i, j));
+					scalar* flw = find_front<scalar>(SIGNAL_NET_FLOW + edge(i, j));
+					if(cnt != nullptr && flw != nullptr)
 					{
-						std::unordered_map<string,std::list<std::shared_ptr<observer>>>::iterator fnd = observable_events.find(SIGNAL_NET_ROUTING+nm);
-						if(fnd != observable_events.end())
+						for(unsigned int k = 0; k < routing.at(i).at(j).size(); k++)
 						{
-							std::list<shared_ptr<observer>>::iterator lst = fnd->second.begin();
-							double flw = static_cast<double>(dynamic_cast<counter*>((*lst).get()) -> get(e->get_cls()) + 1) / e->get_time();
-							unordered_map<string,double> info = e->get_map_info();
-							info.insert({"flow"+nm, flw});
-							message m(info);
-							notify(SIGNAL_NET_ROUTING+nm,m);
+							flw -> update(cnt -> get(k) / time, k);
 						}
-					}
-					else
-					{
-						throw invalid_argument("Measurable event " + nm + " is not defined in network " + get_sid());
-					}
-					// Event successfully enqueued; update the heap for the destination node
-					update_heap(dest);
-				}
-				else
-				{
-					e -> emplace_info(EVENT_NODE, source);
-					// handle block
-					if(handle_block != nullptr)
-					{
-						e -> set_info(EVENT_REJECT, 1.0);
-						pair<bool, int> reroute;
-						bool cond = false;
-						do
-						{
-							reroute = handle_block(e, dest, routing, gen);
-							if(reroute.first)
-							{
-								// Count the routing choice
-								string nm = "_" + std::to_string(source) + "_" + std::to_string(dest);
-								if(observers != 0)
-								{
-									std::unordered_map<string,std::list<std::shared_ptr<observer>>>::iterator fnd = observable_events.find(SIGNAL_NET_ROUTING+nm);
-									if(fnd != observable_events.end())
-									{
-										std::list<shared_ptr<observer>>::iterator lst = fnd->second.begin();
-										double flw = static_cast<double>(dynamic_cast<counter*>((*lst).get()) -> get(e->get_cls()) + 1) / e->get_time();
-										unordered_map<string,double> info = e->get_map_info();
-										info.insert({"flow"+nm, flw});
-										message m(info);
-										notify(SIGNAL_NET_ROUTING+nm,m);
-									}
-								}
-								else
-								{
-									throw invalid_argument("Measurable event " + nm + " is not defined in network " + get_sid());
-								}
-								e -> emplace_info(EVENT_NODE, reroute.second);
-								cond = nodes.at(reroute.second) -> arrival(e);
-								if(cond)
-								{
-									update_heap(reroute.second);
-								}
-								else
-								{
-									e -> emplace_info(EVENT_NODE, source);
-									reroute.first = false;
-								}
-							}
-						}
-						while (!cond && reroute.first);
 					}
 				}
 			}
 		}
-	}
-
-	void network::reset(double time, vector<string> keys, bool newrun)
-	{
+		now = now > time ? now - time : 0.0;
 		for(std::unordered_map<string,list<shared_ptr<observer>>>::iterator it = observable_events.begin(); it != observable_events.end(); it++)
 		{
 			for(shared_ptr<observer> obs: it -> second)
