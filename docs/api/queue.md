@@ -187,7 +187,7 @@ and departs when `V` reaches `F`: its remaining work at time `t` is `w_c * (F - 
 t_next = t_V + (F_min - V) * W
 ```
 
-where `t_V` is the time `V` was last updated. `W` is recomputed from per-class job counts, so it accumulates no rounding error, and `V` restarts from 0 when the server empties. Only the next job's event time is kept up to date; `reset()` brings all of them up to date before shifting them.
+where `t_V` is the time `V` was last updated. `W` is recomputed from per-class job counts, so it accumulates no rounding error, and `V` restarts from 0 when the server empties. Only the next job's event time is kept up to date; before shifting them, `reset()` sets the other jobs' times to the time they would depart if the jobs held did not change.
 
 ### Usage
 

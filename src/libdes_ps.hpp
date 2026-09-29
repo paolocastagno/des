@@ -76,7 +76,8 @@ class des::ps : public des::policy
  *   t = t_V + (F_min - V) * W
  *
  * where t_V is the real time at which V was last updated. Only the next job's event
- * time is kept up to date; the other jobs' times are brought up to date by for_each().
+ * time is kept up to date; for_each() sets the other jobs' times to the time they would
+ * depart if the jobs held did not change.
  *
  * The time of a job pushed at time now must be now + its service requirement when
  * served alone, as set by des::node.
@@ -95,9 +96,8 @@ class des::ps_store : public des::job_store
 		bool has(const function<bool(const event&)>& eligible) const override;
 		size_t size() const override;
 		/**
-		 * @brief Brings every job's time up to date, calls @p f on each job, then resumes
-		 * from the times @p f left (each job keeps departing at its new time unless the
-		 * jobs held change).
+		 * @brief Sets every job's time to the time it would depart if the jobs held did not
+		 * change, calls @p f on each job, then resumes from the times @p f left.
 		 */
 		void for_each(const function<void(event&)>& f) override;
 		void clear() override;
