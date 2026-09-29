@@ -151,14 +151,14 @@ inline double student_t_quantile(double probability, double degrees_freedom)
  * @param v Independent observations, usually one value per completed run.
  * @param mean Mean of @p v, supplied by the caller.
  * @param alpha Significance level, for example 0.05 for a 95 percent CI.
- * @return Lower and upper confidence bounds, or @c [__DBL_MIN__, __DBL_MAX__]
+ * @return Lower and upper confidence bounds, or @c [-__DBL_MAX__, __DBL_MAX__]
  * when the interval cannot be computed.
  */
 template <typename T>
 inline std::pair<double, double> conf_int(const vector<T>& v, double mean, double alpha)
 {
     if(v.size() < 2 || alpha <= 0.0 || alpha >= 1.0)
-        return std::pair<double,double>(__DBL_MIN__, __DBL_MAX__);
+        return std::pair<double,double>(-__DBL_MAX__, __DBL_MAX__);
     double sdev = sample_stddev(v, mean);
     double critical_value = student_t_quantile(1.0 - alpha / 2.0, v.size()-1);
     double interval = sdev/sqrt(v.size()) * critical_value;
@@ -173,14 +173,14 @@ inline std::pair<double, double> conf_int(const vector<T>& v, double mean, doubl
  *
  * @param v Independent observations, usually one value per completed run.
  * @param alpha Significance level, for example 0.05 for a 95 percent CI.
- * @return Lower and upper confidence bounds, or @c [__DBL_MIN__, __DBL_MAX__]
+ * @return Lower and upper confidence bounds, or @c [-__DBL_MAX__, __DBL_MAX__]
  * when the interval cannot be computed.
  */
 template <typename T>
 inline std::pair<double, double> conf_int(const vector<T>& v, double alpha)
 {
     if(v.size() < 2 || alpha <= 0.0 || alpha >= 1.0)
-        return std::pair<double,double>(__DBL_MIN__, __DBL_MAX__);
+        return std::pair<double,double>(-__DBL_MAX__, __DBL_MAX__);
     double mean = vector_mean(v);
     return conf_int(v, mean, alpha);
 }

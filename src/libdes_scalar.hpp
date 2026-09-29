@@ -5,6 +5,8 @@
 #include <memory>
 #include <vector>
 #include <cmath>
+#include <optional>
+#include <stdexcept>
 
 #include "libdes_observer.hpp"
 #include "libdes_observable.hpp"
@@ -35,10 +37,19 @@ namespace des
 class des::scalar : public des::observer {
     public:
         /**
-         * @brief Construct a new scalar observer.
+         * @brief Construct a scalar observing message field @p f, named after it.
          *
-         * @param description  Unique string identifier used both as the observer ID
-         *                     and as the key read from incoming messages.
+         * @param f    Field read from incoming messages (e.g. NODE_SOJOURN).
+         * @param cls  Number of event classes to track independently.
+         */
+        scalar(tag f, int cls) : scalar(tag_registry::name(f), cls)
+        {
+            field = f;
+        }
+        /**
+         * @brief Construct a scalar fed only with update(value, cls).
+         *
+         * @param description  Observer identifier.
          * @param cls          Number of event classes to track independently.
          */
         scalar(const string& description, int cls) : observer()
@@ -56,32 +67,22 @@ class des::scalar : public des::observer {
             run = 0;
         }
         /**
-         * @brief Update from a serialised message string.
-         *
-         * The string is deserialised into a @c des::message; the value keyed by
-         * @c observer_id is fed to the Welford accumulator for the class
-         * identified by @c EVENT_CLS.
-         *
-         * @param m  Serialised message string.
-         */
-        inline void update(string m) override
-        {
-            message msg(m);
-            welford_update(msg.get_value(observer_id),
-                           static_cast<int>(msg.get_value(EVENT_CLS)));
-        }
-        /**
          * @brief Update directly from a @c des::message object.
          *
-         * Avoids the serialisation round-trip of the string overload.
-         * Reads @c observer_id and @c EVENT_CLS from the message.
+         * Reads the observed field and @c EVENT_CLS from the message.
+         *
+         * @throws logic_error if the scalar was built without a field
          *
          * @param msg  Message carrying the measurement value and event class.
          */
         inline void update(const des::message& msg) override
         {
-            welford_update(msg.get_value(observer_id),
-                           static_cast<int>(msg.get_value(EVENT_CLS)));
+            if(!field)
+            {
+                throw logic_error("des::scalar " + observer_id + " reads no message field: construct it with a des::tag to observe one");
+            }
+            welford_update(msg.get_value(*field),
+                           static_cast<int>(msg.get_value(tags::EVENT_CLS)));
         }
         /**
          * @brief Update with an explicit value and class index.
@@ -244,7 +245,7 @@ class des::scalar : public des::observer {
          * @brief Student-t confidence interval for the mean of class @p cls.
          *
          * Built from the vector of per-run means collected via reset(true).
-         * Requires at least two completed runs; returns [DBL_MIN, DBL_MAX]
+         * Requires at least two completed runs; returns [-DBL_MAX, DBL_MAX]
          * if that condition is not met.
          *
          * @param alpha  Significance level (e.g. 0.05 for a 95 % CI).
@@ -259,7 +260,7 @@ class des::scalar : public des::observer {
             }
             else
             {
-                return pair<double, double>(__DBL_MIN__,__DBL_MAX__);
+                return pair<double, double>(-__DBL_MAX__, __DBL_MAX__);
             }
         }
 
@@ -292,6 +293,7 @@ class des::scalar : public des::observer {
         vector<double> q;               ///< Welford M2 accumulator (sum of squared deviations), per class.
         unsigned int   run;             ///< Number of times reset(true) has been called.
         vector<vector<double>> s_runs;  ///< Per-class store of completed-run means.
+        optional<tag> field;             ///< Field read from messages, if any.
 
         /**
          * @brief Feed one sample into the Welford online mean/variance accumulators.

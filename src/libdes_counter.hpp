@@ -37,21 +37,12 @@ class des::counter : public des::observer {
             run = 0;
         }
         /**
-         * @brief Updates the counter value
-         *
-         */
-        inline void update(string m) override
-        {
-            message msg(m);
-            ++c.at(msg.get_value(EVENT_CLS));
-        }
-        /**
          * @brief Updates the counter value directly from a message object (no serialize/deserialize)
          *
          */
         inline void update(const des::message& msg) override
         {
-            ++c.at(static_cast<int>(msg.get_value(EVENT_CLS)));
+            ++c.at(static_cast<int>(msg.get_value(tags::EVENT_CLS)));
         }
         /**
          * @brief Updates the counter value
@@ -140,7 +131,7 @@ class des::counter : public des::observer {
             }
             else
             {
-                return pair<double, double>(__DBL_MIN__,__DBL_MAX__);
+                return pair<double, double>(-__DBL_MAX__, __DBL_MAX__);
             }
         }
 

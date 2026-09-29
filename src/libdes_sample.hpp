@@ -5,6 +5,8 @@
 #include <memory>
 #include <vector>
 #include <cmath>
+#include <optional>
+#include <stdexcept>
 
 #include "libdes_observer.hpp"
 #include "libdes_observable.hpp"
@@ -23,10 +25,19 @@ class des::sample : public des::observer {
         using observer::update;
 
         /**
-         * @brief Construct a new sample observer.
+         * @brief Construct a sample observing message field @p f, named after it.
          *
-         * @param description  Unique string identifier used as the observer ID
-         *                     and as the key read from incoming messages.
+         * @param f    Field read from incoming messages (e.g. NODE_SOJOURN).
+         * @param cls  Number of event classes to track independently.
+         */
+        sample(tag f, int cls) : sample(tag_registry::name(f), cls)
+        {
+            field = f;
+        }
+        /**
+         * @brief Construct a sample fed only with update(value, cls).
+         *
+         * @param description  Observer identifier.
          * @param cls          Number of event classes to track independently.
          */
         sample(const string& description, int cls) : observer()
@@ -42,17 +53,21 @@ class des::sample : public des::observer {
             run = 0;
         }
         /**
-         * @brief Update from a serialised message string.
+         * @brief Update directly from a @c des::message object.
          *
-         * Appends the value keyed by @c observer_id to the sample vector of the
-         * class identified by @c EVENT_CLS.
+         * Appends the observed field to the samples of the class identified
+         * by @c EVENT_CLS.
          *
-         * @param m  Serialised message string.
+         * @throws logic_error if the sample was built without a field
+         *
+         * @param msg  Message carrying the measurement value and event class.
          */
-        inline void update(string m) override{
-            message msg(m);
-            v.at(msg.get_value(EVENT_CLS)).push_back(msg.get_value(observer_id));
-            sum.at(msg.get_value(EVENT_CLS)) += msg.get_value(observer_id);
+        inline void update(const des::message& msg) override{
+            if(!field)
+            {
+                throw logic_error("des::sample " + observer_id + " reads no message field: construct it with a des::tag to observe one");
+            }
+            update(msg.get_value(*field), static_cast<int>(msg.get_value(tags::EVENT_CLS)));
         }
         /**
          * @brief Update with an explicit value and class index.
@@ -182,7 +197,7 @@ class des::sample : public des::observer {
             string str = "\t" + observer_id;
             for(unsigned int i = 0; i < v.size(); i++)
             {
-                str = "\t(" + std::to_string(i) + ")\t" + std::to_string(sum.at(i) / ((double)v.at(i).size())) + "(" + std::to_string(stddev(i)) + ")";
+                str += "\t(" + std::to_string(i) + ")\t" + std::to_string(sum.at(i) / ((double)v.at(i).size())) + "(" + std::to_string(stddev(i)) + ")";
             }
             return str;
         }
@@ -194,7 +209,7 @@ class des::sample : public des::observer {
             }
             else
             {
-                return pair<double, double>(__DBL_MAX__,__DBL_MAX__);
+                return pair<double, double>(-__DBL_MAX__, __DBL_MAX__);
             }
         }
 
@@ -216,6 +231,7 @@ class des::sample : public des::observer {
         vector<double>              sum;     ///< Running sum, per class.
         vector<vector<double>> s_runs;  ///< Per-class store of completed-run sums.
         int                              run;     ///< Number of completed runs.
+        optional<tag> field;             ///< Field read from messages, if any.
 };
 
 #endif

@@ -2,6 +2,8 @@
 
 Observers implement the measurement layer. They are attached to an `observable` node on a named signal and receive a `des::message` each time that signal fires. The library ships four concrete observer types.
 
+`scalar`, `sample` and `histogram` measure one field of the notified event, given as a [tag](tags.md) when they are built (e.g. `NODE_SOJOURN`, or a tag from `des::tag_registry::define()`); they are then named after that field. Built with a description instead, they measure nothing by themselves and are fed directly with `update(value, cls)`; notifying them a message throws `std::logic_error`.
+
 All observers inherit from `des::observer`.
 
 ---
@@ -19,8 +21,7 @@ unsigned int get_id();              // unique numeric ID
 
 void set_event(std::string signal);
 
-virtual void update(std::string message) = 0;
-virtual void update(const des::message& msg);
+virtual void update(const des::message& msg) = 0;   // fields addressed by des::tag
 virtual void reset(bool newrun = false)          = 0;
 virtual void reset(int cls, bool newrun = false) = 0;
 virtual void clear()                     = 0;
@@ -38,14 +39,14 @@ Collects a running mean and variance for a single numeric quantity, supporting m
 ### Constructor
 
 ```cpp
-scalar(const std::string& description, int n_classes);
+scalar(des::tag field, int n_classes);                 // measures `field`, named after it
+scalar(const std::string& description, int n_classes); // fed with update(value, cls) only
 ```
 
 ### Updating
 
 ```cpp
-void update(std::string message);       // parse value from message key-value string
-void update(const des::message& msg);   // update directly from message object
+void update(const des::message& msg);   // reads the field and EVENT_CLS
 void update(double value, int cls);     // direct update for class cls
 ```
 
@@ -91,9 +92,8 @@ counter(const std::string& description, int n_classes);
 ### Updating
 
 ```cpp
-void update(std::string message);   // increment from message
-void update(const des::message& msg);
-void update(int cls);               // increment class cls by 1
+void update(const des::message& msg);   // increments the class EVENT_CLS
+void update(int cls);                   // increment class cls by 1
 ```
 
 ### Reading
@@ -123,13 +123,14 @@ Note: memory usage grows linearly with the number of events.
 ### Constructor
 
 ```cpp
-sample(const std::string& description, int n_classes);
+sample(des::tag field, int n_classes);                 // stores `field`, named after it
+sample(const std::string& description, int n_classes); // fed with update(value, cls) only
 ```
 
 ### Updating
 
 ```cpp
-void update(std::string message);
+void update(const des::message& msg);
 void update(double value, int cls);
 ```
 
@@ -165,7 +166,9 @@ Bins observations into equal-width buckets. Useful for visualising service-time 
 ### Constructor
 
 ```cpp
-histogram(const std::string& description, int n_classes);
+histogram(des::tag field, int n_classes);                               // bins `field`, named after it
+histogram(des::tag field, const std::string& event, int n_classes);
+histogram(const std::string& description, int n_classes);               // fed with update(value, cls) only
 histogram(const std::string& description, const std::string& event, int n_classes);
 ```
 
@@ -181,7 +184,7 @@ Returns `true` when the bin size was changed. It must be called before any curre
 
 ```cpp
 void update(double value, int cls);
-void update(std::string message);
+void update(const des::message& msg);
 ```
 
 ### Run Management
@@ -225,8 +228,8 @@ void clear();                     // clears current buckets; completed-run data 
 ## Attaching an Observer
 
 ```cpp
-auto thr = std::make_shared<des::scalar>("throughput", 1);
-myNode->attach(SIGNAL_NODE_DEPARTURE, thr);
+auto sojourn = std::make_shared<des::scalar>(NODE_SOJOURN, 1);
+myNode->attach(SIGNAL_NODE_DEPARTURE, sojourn);
 ```
 
 After `attach()` the observer's `update(const des::message&)` method is called automatically every time `myNode` fires `SIGNAL_NODE_DEPARTURE`.

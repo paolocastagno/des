@@ -8,6 +8,9 @@
 #include <vector>
 #include <algorithm>
 #include <cmath>
+#include <limits>
+#include <optional>
+#include <stdexcept>
 
 #include "libdes_observer.hpp"
 #include "libdes_observable.hpp"
@@ -170,10 +173,30 @@ class des::histogram : public des::observer {
         } bin;
 
         /**
-         * @brief Construct a histogram observer.
+         * @brief Construct a histogram observing message field @p f, named after it.
          *
-         * @param description String identifier of the observer and incoming
-         *                    message key to read.
+         * @param f Field read from incoming messages (e.g. NODE_SOJOURN).
+         * @param cls Number of event classes to track independently.
+         */
+        histogram(tag f, int cls) : histogram(tag_registry::name(f), cls)
+        {
+            field = f;
+        }
+        /**
+         * @brief Construct a histogram observing message field @p f, already associated with an event.
+         *
+         * @param f Field read from incoming messages.
+         * @param evnt Observable event string identifier.
+         * @param cls Number of event classes to track independently.
+         */
+        histogram(tag f, const string& evnt, int cls) : histogram(f, cls)
+        {
+            event = evnt;
+        }
+        /**
+         * @brief Construct a histogram fed only with update(value, cls).
+         *
+         * @param description String identifier of the observer.
          * @param cls Number of event classes to track independently.
          */
         histogram(const string& description, int cls) : observer() // description, id_gen++){}
@@ -191,10 +214,9 @@ class des::histogram : public des::observer {
             s_runs = vector<vector<vector<histogram::bin>>>(class_count, vector<vector<histogram::bin>>());
         }
         /**
-         * @brief Construct a histogram observer already associated with an event.
+         * @brief Construct a histogram fed only with update(value, cls), already associated with an event.
          *
-         * @param description String identifier of the observer and incoming
-         *                    message key to read.
+         * @param description String identifier of the observer.
          * @param evnt Observable event string identifier.
          * @param cls Number of event classes to track independently.
          */
@@ -212,37 +234,40 @@ class des::histogram : public des::observer {
          * @param cls Event-class index.
          */
         inline void update(double value, int cls){
-            int rounded_value = static_cast<int>(floor(value/bin_size));
+            const double scaled = floor(value/bin_size);
+            // Bins are stored densely from 0, so negative (or NaN) values cannot be
+            // represented, and values beyond INT_MAX bins would overflow the index.
+            if(!(scaled >= 0 && scaled < static_cast<double>(numeric_limits<int>::max())))
+            {
+                throw invalid_argument("des::histogram " + observer_id + ": value " + std::to_string(value) + " cannot be binned with bin size " + std::to_string(bin_size));
+            }
+            int rounded_value = static_cast<int>(scaled);
             const double binned_value = static_cast<double>(rounded_value)*bin_size;
-            vector<histogram::bin>::iterator fnd = std::find(v.at(cls).begin(), v.at(cls).end(), binned_value);
-            if(fnd != v.at(cls).end())
+            // Current-run bins are dense from 0: bin k holds the values in [k * bin_size, (k + 1) * bin_size)
+            vector<histogram::bin>& bins = v.at(cls);
+            while(bins.size() <= static_cast<size_t>(rounded_value))
             {
-                ++(*fnd);
+                bins.push_back(histogram::bin(static_cast<double>(bins.size())*bin_size, 0));
             }
-            else
-            {
-                int current = v.at(cls).size();
-                while(current <= rounded_value)
-                {
-                    v.at(cls).push_back(histogram::bin(static_cast<double>(current)*bin_size, 0));
-                    ++current;
-                }
-                ++(v.at(cls).at(current-1));
-            }
+            ++bins[rounded_value];
             sum.at(cls) += binned_value;
             ++(elements.at(cls));
         }
         /**
-         * @brief Update from a serialized observer message.
+         * @brief Update directly from a @c des::message object.
          *
-         * Reads the sample value from the key named by @c observer_id and the
-         * class index from @c EVENT_CLS.
+         * Reads the sample value from the observed field and the class index
+         * from @c EVENT_CLS.
          *
-         * @param m Serialized @c des::message.
+         * @param msg Message carrying the measurement value and event class.
+         * @throws logic_error if the histogram was built without a field
          */
-        inline void update(string m) override{
-            message msg(m);
-            update(msg.get_value(observer_id), msg.get_value(EVENT_CLS));
+        inline void update(const des::message& msg) override{
+            if(!field)
+            {
+                throw logic_error("des::histogram " + observer_id + " reads no message field: construct it with a des::tag to observe one");
+            }
+            update(msg.get_value(*field), static_cast<int>(msg.get_value(tags::EVENT_CLS)));
         }
         /**
          * @brief Set the bin width while no current-run buckets exist.
@@ -380,7 +405,7 @@ class des::histogram : public des::observer {
             string str = "\t" + observer_id;
             for(unsigned int i = 0; i < v.size(); i++)
             {
-                str = "\t(" + std::to_string(i) + ")\t" + std::to_string(sum.at(i) / static_cast<double>(elements.at(i))) + "(" + std::to_string(stddev(i)*0.5) + ")";
+                str += "\t(" + std::to_string(i) + ")\t" + std::to_string(sum.at(i) / static_cast<double>(elements.at(i))) + "(" + std::to_string(stddev(i)*0.5) + ")";
             }
             return str;
         }
@@ -605,6 +630,7 @@ class des::histogram : public des::observer {
         vector<double> sum;                                 ///< Sum of current-run binned values, per class.
         int run;                                                 ///< Number of completed all-class runs.
         vector<vector<vector<histogram::bin>>> s_runs; ///< Completed-run buckets, indexed by class then run.
+        optional<tag> field;             ///< Field read from messages, if any.
 };
 
 #endif

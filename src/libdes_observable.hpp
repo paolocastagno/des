@@ -35,7 +35,7 @@ class des::observable
 			 * All attached observers are detached before destruction so their attached
 			 * flags do not continue to point conceptually at a dead observable.
 			 */
-		~observable()
+		virtual ~observable()
 		{
 			if(observers != 0)
 			{
@@ -70,7 +70,7 @@ class des::observable
 				++observers;
 			}
 			else{
-				throw invalid_argument("Measurable event " + obs -> get_event() + " is not defined in network " + get_sid());
+				throw invalid_argument("Measurable event " + event + " is not defined in " + get_sid());
 			}
         }
 			/**
