@@ -30,3 +30,6 @@ Welcome to the **libdes** documentation — a C++ library for building Discrete 
 - [Message](api/message.md) — key-value container used for observer notifications
 - [Tags](api/tags.md) — tag registry for event and message fields, and how to use it in hot paths
 - [Constants](api/constants.md) — all named constants, info keys, and signal names
+
+### Development
+- [Testing](testing.md) — test tiers, Makefile targets, writing tests, continuous integration

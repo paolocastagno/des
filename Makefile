@@ -136,3 +136,97 @@ else
 profile-sample:
 			@echo "profile-sample uses macOS sample; run profile-time on $(OS)."
 endif
+
+# ---------------------------------------------------------------------------
+# Test pipeline (see docs/testing.md)
+#
+# Each configuration compiles the workspace sources (src/) together with the
+# test suites into its own directory under $(BUILD_DIR): the installed library
+# is never used.
+#
+#   make check            unit and regression tests
+#   make validate         statistical validation against queueing theory
+#   make check-sanitize   unit and regression tests under ASan+UBSan, [threads] under TSan
+#   make coverage         line coverage of src/ (clang)
+#   make bench            benchmark table (not pass/fail)
+#   make golden           write the regression golden values for this platform
+#   make ci               check, validate and check-sanitize
+#   make clean-build      remove $(BUILD_DIR)
+#
+# TEST_ARGS passes options to the runner, e.g. make check TEST_ARGS=-v.
+# To run a subset: build/check/des_tests "[network]" (see --help).
+# ---------------------------------------------------------------------------
+BUILD_DIR      ?= build
+TEST_ARGS      ?=
+SUITE_SOURCES   = $(wildcard test/harness/*.cpp test/unit/*.cpp test/regression/*.cpp test/validation/*.cpp)
+SUITE_OBJECTS   = $(patsubst %.cpp,%.o,$(SOURCES) $(SUITE_SOURCES))
+BENCH_OBJECTS   = $(patsubst %.cpp,%.o,$(SOURCES) test/bench/bench.cpp)
+SUITE_INCLUDES  = -I src -I test/harness -I test/support
+SUITE_DEFINES   = -DDES_GOLDEN_DIR=\"test/regression/golden\"
+SUITE_THREADS   = -pthread
+
+CHECK_FLAGS     = -O2 -g
+SANITIZE_FLAGS  = -O1 -g -fno-omit-frame-pointer -fsanitize=address,undefined -fno-sanitize-recover=undefined
+TSAN_FLAGS      = -O1 -g -fno-omit-frame-pointer -fsanitize=thread
+COVERAGE_FLAGS  = -O0 -g -fprofile-instr-generate -fcoverage-mapping
+BENCH_FLAGS     = -O3 -DNDEBUG
+COVERAGE_IGNORE = (test/|/usr/|/Library/|/opt/)
+
+ifeq ($(OS),Darwin)
+  LLVM_COV      ?= xcrun llvm-cov
+  LLVM_PROFDATA ?= xcrun llvm-profdata
+else
+  LLVM_COV      ?= llvm-cov
+  LLVM_PROFDATA ?= llvm-profdata
+endif
+
+# Rules of one configuration. $(1): name, $(2): name of the variable holding its flags
+# (passed by name because the flags may contain commas).
+define DES_SUITE
+$(BUILD_DIR)/$(1)/%.o: %.cpp
+	@mkdir -p $$(@D)
+	$$(CXX) $$(CSTD) $$(WARNING) $$($(2)) $$(SUITE_THREADS) $$(SUITE_INCLUDES) $$(SUITE_DEFINES) -MMD -MP -c $$< -o $$@
+$(BUILD_DIR)/$(1)/des_tests: $$(addprefix $(BUILD_DIR)/$(1)/,$$(SUITE_OBJECTS))
+	$$(CXX) $$($(2)) $$(SUITE_THREADS) $$^ -o $$@
+-include $$(wildcard $$(patsubst %.o,$(BUILD_DIR)/$(1)/%.d,$$(SUITE_OBJECTS) test/bench/bench.o))
+endef
+$(eval $(call DES_SUITE,check,CHECK_FLAGS))
+$(eval $(call DES_SUITE,sanitize,SANITIZE_FLAGS))
+$(eval $(call DES_SUITE,tsan,TSAN_FLAGS))
+$(eval $(call DES_SUITE,coverage,COVERAGE_FLAGS))
+$(eval $(call DES_SUITE,bench,BENCH_FLAGS))
+
+$(BUILD_DIR)/bench/des_bench: $(addprefix $(BUILD_DIR)/bench/,$(BENCH_OBJECTS))
+	$(CXX) $(BENCH_FLAGS) $(SUITE_THREADS) $^ -o $@
+
+.PHONY: check validate check-sanitize coverage bench golden ci clean-build
+
+check: $(BUILD_DIR)/check/des_tests
+	./$< $(TEST_ARGS) "[unit]" "[regression]"
+
+validate: $(BUILD_DIR)/check/des_tests
+	./$< $(TEST_ARGS) "[validation]"
+
+check-sanitize: $(BUILD_DIR)/sanitize/des_tests $(BUILD_DIR)/tsan/des_tests
+	UBSAN_OPTIONS=print_stacktrace=1 ./$(BUILD_DIR)/sanitize/des_tests $(TEST_ARGS) "[unit]" "[regression]"
+	TSAN_OPTIONS=halt_on_error=1 ./$(BUILD_DIR)/tsan/des_tests $(TEST_ARGS) "[threads]"
+
+coverage: $(BUILD_DIR)/coverage/des_tests
+	$(RM) $(BUILD_DIR)/coverage/*.profraw
+	LLVM_PROFILE_FILE=$(BUILD_DIR)/coverage/des-%p.profraw ./$< "[unit]" "[regression]" "[validation]"
+	$(LLVM_PROFDATA) merge -sparse $(BUILD_DIR)/coverage/*.profraw -o $(BUILD_DIR)/coverage/des.profdata
+	$(LLVM_COV) report $< -instr-profile=$(BUILD_DIR)/coverage/des.profdata -ignore-filename-regex='$(COVERAGE_IGNORE)' | tee $(BUILD_DIR)/coverage/summary.txt
+	$(LLVM_COV) show $< -instr-profile=$(BUILD_DIR)/coverage/des.profdata -ignore-filename-regex='$(COVERAGE_IGNORE)' -format=html -output-dir=$(BUILD_DIR)/coverage/html
+	@echo "HTML report: $(BUILD_DIR)/coverage/html/index.html"
+
+bench: $(BUILD_DIR)/bench/des_bench
+	./$<
+
+golden: $(BUILD_DIR)/check/des_tests
+	./$< --update-golden "[regression]"
+	@echo "Review the changes under test/regression/golden before committing them."
+
+ci: check validate check-sanitize
+
+clean-build:
+	$(RM) -r $(BUILD_DIR)
