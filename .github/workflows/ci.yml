@@ -1,0 +1,103 @@
+name: CI
+
+# Test pipeline, see docs/testing.md. Every job builds the workspace sources with the
+# Makefile targets; nothing is installed.
+
+on:
+  push:
+  pull_request:
+  schedule:
+    - cron: "0 3 * * *"   # nightly: catches toolchain and runner-image changes
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: check + validate (${{ matrix.os }}, ${{ matrix.cxx }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { os: ubuntu-24.04, cxx: g++ }
+          - { os: ubuntu-24.04, cxx: clang++ }
+          - { os: macos-latest, cxx: clang++ }
+    env:
+      CXX: ${{ matrix.cxx }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Toolchain
+        run: $CXX --version
+      - name: Unit and regression tests
+        run: make -j"$(getconf _NPROCESSORS_ONLN)" check
+      - name: Validation against queueing theory
+        run: make validate
+      # Golden values are per platform: regression tests of a platform without them are
+      # skipped. This artifact holds the values generated here, to review and commit.
+      - name: Generate golden values for this platform
+        if: always()
+        run: make golden
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: golden-${{ matrix.os }}-${{ matrix.cxx }}
+          path: test/regression/golden
+
+  sanitize:
+    name: sanitizers (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, macos-latest]
+    env:
+      CXX: clang++
+    steps:
+      - uses: actions/checkout@v4
+      - name: Allow ThreadSanitizer's memory layout
+        if: runner.os == 'Linux'
+        run: sudo sysctl vm.mmap_rnd_bits=28
+      - name: ASan + UBSan (unit, regression) and TSan (threads)
+        run: make -j"$(getconf _NPROCESSORS_ONLN)" check-sanitize
+
+  coverage:
+    name: coverage
+    runs-on: ubuntu-24.04
+    env:
+      CXX: clang++
+    steps:
+      - uses: actions/checkout@v4
+      - name: LLVM tools matching the compiler
+        run: |
+          v=$(clang++ --version | sed -n 's/.*clang version \([0-9]*\).*/\1/p')
+          echo "LLVM_COV=llvm-cov-$v" >> "$GITHUB_ENV"
+          echo "LLVM_PROFDATA=llvm-profdata-$v" >> "$GITHUB_ENV"
+          command -v llvm-cov-$v || (sudo apt-get update && sudo apt-get install -y llvm-$v)
+      - name: Coverage
+        run: make -j"$(getconf _NPROCESSORS_ONLN)" coverage LLVM_COV="$LLVM_COV" LLVM_PROFDATA="$LLVM_PROFDATA"
+      - name: Summary
+        run: |
+          echo '### Coverage of src/' >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+          tail -n 1 build/coverage/summary.txt >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: coverage-html
+          path: build/coverage/html
+
+  bench:
+    name: benchmarks (report only)
+    if: github.event_name != 'pull_request'
+    runs-on: macos-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - name: Benchmarks
+        run: |
+          make -j"$(getconf _NPROCESSORS_ONLN)" build/bench/des_bench
+          echo '### Benchmarks (shared runner: compare trends, not single values)' >> "$GITHUB_STEP_SUMMARY"
+          ./build/bench/des_bench | tee -a "$GITHUB_STEP_SUMMARY"
