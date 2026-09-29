@@ -6,3 +6,6 @@
 test/test
 test/test.dSYM/
 profile/
+build/
+test/*.dSYM/
+.vscode/*.log
