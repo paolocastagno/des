@@ -59,24 +59,24 @@ Each node owns one or more `des::queue` objects that act as its local Future Eve
 
 ### 2. Observer Pattern
 
-Nodes inherit from `des::observable`. Any `des::observer` subclass (`scalar`, `counter`, `sample`, `histogram`) can be **attached** to a node on a named signal (e.g. `SIGNAL_NODE_ARRIVAL`, `SIGNAL_NODE_DEPARTURE`). When the node fires that signal it serialises relevant state into a `des::message` and calls `notify()`, which forwards the message to all registered observers.
+Nodes inherit from `des::observable`. Any `des::observer` subclass (`scalar`, `counter`, `sample`, `histogram`) can be **attached** to a node on a named signal (e.g. `SIGNAL_NODE_ARRIVAL`, `SIGNAL_NODE_DEPARTURE`). When the node fires that signal it passes a `des::message` view of the event's fields to all registered observers, which read the fields they measure by [tag](api/tags.md).
 
 ```cpp
-auto throughput = std::make_shared<des::scalar>("throughput", 1);
-myNode->attach(SIGNAL_NODE_DEPARTURE, throughput);
+auto sojourn = std::make_shared<des::scalar>(NODE_SOJOURN, 1);   // measures the NODE_SOJOURN field
+myNode->attach(SIGNAL_NODE_DEPARTURE, sojourn);
 ```
 
 ### 3. Policy Pattern (Queue Disciplines)
 
 Queue behaviour is encapsulated in a `des::policy` subclass. The built-in policies are:
 
-| Class | Discipline |
-|---|---|
-| `des::fifo` | First-In First-Out |
-| `des::is` | Infinite Server (no waiting) |
-| `des::ps` | Processor Sharing / Generalized Processor Sharing (GPS) |
+| Class | Discipline | Store |
+|---|---|---|
+| `des::fifo` | First-In First-Out | `des::sequence_store` (deque in time order) |
+| `des::is` | Infinite Server (no waiting) | `des::time_store` (binary heap) |
+| `des::ps` | Processor Sharing / Generalized Processor Sharing (GPS) | `des::ps_store` (heap on virtual finish tags) |
 
-Custom disciplines are implemented by subclassing `des::policy` and overriding the three `update()` overloads, `front()`, and optionally `on_dequeue()`. The `on_dequeue(list, time)` hook is called by `queue::dequeue(time)` before the departing element is removed, giving the policy the opportunity to update the remaining events (as `des::ps` does to rescale departure times).
+A policy has two responsibilities: it decides which jobs a queue admits (`admit()`), and it creates the `des::job_store` that holds the queue's jobs (`make_store()`). The store owns the container and the release order, including time-dependent bookkeeping such as the processor-sharing virtual time. `des::queue` and `des::node` only use the abstract `job_store` interface, so a new discipline is added by deriving a store and a policy, without changing the library (see [Implementing a custom policy](api/queue.md#implementing-a-custom-policy)). A policy may be shared by several queues: each queue asks it for its own store.
 
 ### 4. Template-Based Distributions (Station)
 
@@ -122,7 +122,7 @@ for (int i = 0; i < N_EVENTS; ++i)
 
 ## Multi-Run Support
 
-Each node and observer supports `reset(double time, vector<string> keys, bool newrun)`. Calling `net.reset(sim_time, {}, true)` at the end of a run preserves between-run statistics (mean of means, between-run variance) while clearing within-run state, enabling confidence-interval estimation across multiple independent replications.
+Each node and observer supports `reset(double time, vector<des::tag> keys, bool newrun)`, where `keys` lists the event fields holding times to shift along with the clock. Calling `net.reset(sim_time, {}, true)` at the end of a run preserves between-run statistics (mean of means, between-run variance) while clearing within-run state, enabling confidence-interval estimation across multiple independent replications.
 
 ---
 

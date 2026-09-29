@@ -67,7 +67,7 @@ auto sojourn = make_shared<des::scalar>(NODE_SOJOURN, 1);
 sta->attach(SIGNAL_NODE_DEPARTURE, sojourn);
 ```
 
-Every time a job departs the station `SIGNAL_NODE_DEPARTURE` is fired. The node serialises the departure message with keys including `NODE_SOJOURN` (total time in node = wait + service). The scalar's description is also `NODE_SOJOURN`, so `update(message)` extracts exactly that key on each departure.
+Every time a job departs the station `SIGNAL_NODE_DEPARTURE` is fired. The departure message carries the event's fields, including `NODE_SOJOURN` (total time in node = wait + service). The scalar was built with the `NODE_SOJOURN` tag, so `update(message)` reads exactly that field on each departure.
 
 ---
 
