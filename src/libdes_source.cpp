@@ -44,14 +44,14 @@ namespace des
 		return exp.at(cls)(*gen.get());
 	}
 
-	int source::enqueue(shared_ptr<event>&, vector<vector<int>>)
+	int source::enqueue(const shared_ptr<event>&, const vector<vector<int>>&)
 	{
 		// object::TraceLoc(source_location::current(), std::to_string(e->get_id()), " time ",
 		// 				 e->get_time(), " node ", std::to_string(get_id()));
 		return 0;
 	}
 
-	int source::dequeue(shared_ptr<event>& e, vector<vector<int>>)
+	int source::dequeue(const shared_ptr<event>& e, const vector<vector<int>>&)
 	{
 		// object::TraceLoc(source_location::current(), std::to_string(e->get_id()), " time ",
 		// 				 e->get_time(), " node ", std::to_string(get_id()));
@@ -62,7 +62,7 @@ namespace des
 		return 0;
 	}
 
-	int source::schedule(shared_ptr<event>&, vector<vector<int>>)
+	int source::schedule(const shared_ptr<event>&, const vector<vector<int>>&)
 	{
 		return 0;
 	}

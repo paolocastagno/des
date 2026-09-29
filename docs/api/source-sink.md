@@ -75,7 +75,7 @@ Shared base for `source` and `sink` that provides an **event pool** to reduce al
 
 ```cpp
 std::shared_ptr<event> get_event();
-void                   dispose_event(std::shared_ptr<event> e);
+void                   dispose_event(const std::shared_ptr<event>& e);
 ```
 
 ---

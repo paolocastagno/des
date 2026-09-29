@@ -11,10 +11,13 @@ namespace des
 	sink::sink(string description) : sink(description, 1)
 	{}
 
+	sink::sink(vector<double> r, string description, mt19937_64&) : sink(description, static_cast<int>(r.size()))
+	{}
+
 	sink::~sink()
 	{}
 
-	int sink::schedule(shared_ptr<event>&, vector<vector<int>>)
+	int sink::schedule(const shared_ptr<event>&, const vector<vector<int>>&)
 	{
 		// It does not matter the class of the incoming job, all jobs get cleared and
 		// disposed in the events list for future use.
@@ -23,14 +26,14 @@ namespace des
 		return 0;
 	}
 
-	int sink::enqueue(shared_ptr<event>&, vector<vector<int>>)
+	int sink::enqueue(const shared_ptr<event>&, const vector<vector<int>>&)
 	{
 		// It does not matter the class of the incoming job, all jobs get cleared and
 		// disposed in the events list for future use
 		return 0;
 	}
 
-	int sink::dequeue(shared_ptr<event>& e, vector<vector<int>>)
+	int sink::dequeue(const shared_ptr<event>& e, const vector<vector<int>>&)
 	{
 		dispose_event(e);
 		return 0;

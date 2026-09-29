@@ -156,17 +156,17 @@ namespace des
 	}
 
 	template<typename TT, template <typename> typename T>
-	int station<TT, T>::enqueue(shared_ptr<event>& e, vector<vector<int>> q_map)
+	int station<TT, T>::enqueue(const shared_ptr<event>& e, const vector<vector<int>>& q_map)
 	{
 		if(q_map.size() > 0)
 		{ 
-			unsigned int last = 0;
+			int last = -1;
 			vector<unsigned int> indexes({});
 			for(unsigned int i = 0; i < q_map.size(); i++)
 			{
 				if(q_map.at(i).at(e->get_cls()) != 0)
 				{
-					last = i;
+					last = static_cast<int>(i);
 					if(!q.at(i) -> is_full())
 					{
 						indexes.push_back(i);
@@ -175,7 +175,7 @@ namespace des
 			}
 			if(indexes.size() == 0)
 			{
-				return static_cast<int>(last);
+				return last;
 			}
 			else
 			{
@@ -187,9 +187,9 @@ namespace des
 	}
 
 	template<typename TT, template <typename> typename T>
-	int station<TT, T>::dequeue(shared_ptr<event>& e, vector<vector<int>> q_map)
+	int station<TT, T>::dequeue(const shared_ptr<event>& e, const vector<vector<int>>& q_map)
 	{
-		unsigned int last = 0;
+		int last = -1;
 		if(q_map.size() > 0)
 		{
 			vector<unsigned int> indexes({});
@@ -197,7 +197,7 @@ namespace des
 			{
 				if(q_map.at(i).at(e->get_cls()) != 0)
 				{
-					last = i;
+					last = static_cast<int>(i);
 					if(q.at(i) -> in_queue() != 0)
 					{
 						indexes.push_back(i);
@@ -206,7 +206,7 @@ namespace des
 			}
 			if(indexes.size() == 0)
 			{
-				return static_cast<int>(last);
+				return last;
 			}
 			else
 			{
@@ -218,17 +218,17 @@ namespace des
 	}
 
 	template<typename TT, template <typename> typename T>
-	int station<TT, T>::schedule(shared_ptr<event>& e, vector<vector<int>> s_map)
+	int station<TT, T>::schedule(const shared_ptr<event>& e, const vector<vector<int>>& s_map)
 	{
 		if(s_map.size() > 0)
 		{
-			unsigned int last = 0;
+			int last = -1;
 			vector<unsigned int> indexes({});
 			for(unsigned int i = 0; i < s_map.size(); i++)
 			{
 				if(s_map.at(i).at(e->get_cls()) != 0)
 				{
-					last = i;
+					last = static_cast<int>(i);
 					if(!s.at(i) -> is_full())
 					{
 						indexes.push_back(i);
@@ -237,7 +237,7 @@ namespace des
 			}
 			if(indexes.size() == 0)
 			{
-				return static_cast<int>(last);
+				return last;
 			}
 			else
 			{
@@ -246,6 +246,26 @@ namespace des
 			}
 		}
 		return -1;
+	}
+
+	template<typename TT, template <typename> typename T>
+	int station<TT, T>::shfunc(const shared_ptr<event>&, int sched, const vector<vector<int>>&, const vector<shared_ptr<queue>>& queues, shared_ptr<mt19937_64>& g)
+	{
+		unsigned int srv = static_cast<unsigned int>(sched);
+		vector<unsigned int> indexes({});
+		for(unsigned int i = 0; i < queues.size(); i++)
+		{
+			if(queues.at(i) -> has_next([this, srv](const event& w){ return this -> can_serve(srv, static_cast<unsigned int>(w.get_cls())); }))
+			{
+				indexes.push_back(i);
+			}
+		}
+		if(indexes.size() == 0)
+		{
+			return -1;
+		}
+		uniform_int_distribution<int> idx(0,indexes.size()-1);
+		return indexes.at(idx(*g.get()));
 	}
 
 	template<typename TT, template <typename> typename T>

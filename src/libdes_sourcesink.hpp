@@ -72,24 +72,29 @@ class des::sourcesink : public des::node
 		/**
 		 * @brief Get a cleared event object from the reusable source/sink pool.
 		 *
-		 * Allocates a new event only when the pool is empty. Reused events are
-		 * cleared before being returned.
+		 * Only events no longer referenced outside the pool are reused (the sink
+		 * disposes an event before it is returned by network::next_event(), and
+		 * callers may keep it). Pooled events still referenced elsewhere are left
+		 * to their other owners. A new event is allocated when none is reusable.
+		 * Reused events are cleared before being returned.
 		 *
 		 * @return Event ready to be initialized for a new source arrival.
 		 */
 		shared_ptr<event> get_event()
 		{
-			if(events.empty())
+			// Resolve the thread_local pool once
+			list<shared_ptr<event>>& pool = events;
+			while(!pool.empty())
 			{
-				return shared_ptr<event>(new event());
+				shared_ptr<event> ret = std::move(pool.front());
+				pool.pop_front();
+				if(ret.use_count() == 1)
+				{
+					ret -> clear();
+					return ret;
+				}
 			}
-			else
-			{
-				shared_ptr<event> ret = *events.begin();
-				events.pop_front();
-				ret -> clear();
-				return ret;
-			}
+			return make_shared<event>();
 		}
 		/**
 		 * @brief Return an event to the reusable source/sink pool.
@@ -98,7 +103,7 @@ class des::sourcesink : public des::node
 		 *
 		 * @param e Event to recycle.
 		 */
-		void dispose_event(shared_ptr<event> e)
+		void dispose_event(const shared_ptr<event>& e)
 		{
 			events.push_back(e);
 		}
@@ -112,7 +117,7 @@ class des::sourcesink : public des::node
 		 * @param keys Additional event-info keys whose times should be shifted.
 		 * @param newrun When true, observers snapshot their current-run values.
 		 */
-		void reset(double value, vector<string> keys = vector<string>(), bool newrun = false) override
+		void reset(double value, vector<tag> keys = vector<tag>(), bool newrun = false) override
 		{
 			node::reset(value, keys, newrun);
 		}
@@ -124,7 +129,7 @@ class des::sourcesink : public des::node
 			node::clear();
 		}
 	private:
-		inline static list<shared_ptr<event>> events = list<shared_ptr<event>>(); ///< Shared pool of reusable terminal/source events.
+		inline static thread_local list<shared_ptr<event>> events = list<shared_ptr<event>>(); ///< Per-thread pool of reusable terminal/source events.
 };
 
 #endif

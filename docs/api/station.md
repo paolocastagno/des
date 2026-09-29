@@ -86,19 +86,21 @@ The station can also use a **custom service-pick handler** to choose from which 
 Handler signature:
 
 ```cpp
-int service_pick_handler(std::shared_ptr<des::event> trigger,
+int service_pick_handler(const std::shared_ptr<des::event>& trigger,
                          int server_idx,
                          const std::vector<std::vector<int>>& q_map,
                          const std::vector<std::shared_ptr<des::queue>>& queues,
                          std::shared_ptr<std::mt19937_64>& gen);
 ```
 
-If no handler is provided, `des::station` keeps the default behavior.
+`server_idx` is the server that has just been freed. The node then moves into it the first job of the returned queue, in that queue's release order, whose class the server may serve (according to the server map); returning `-1`, or a queue without such a job, leaves the server idle.
+
+If no handler is provided, `des::station` picks uniformly at random among the waiting queues holding at least one job the freed server may serve.
 
 ## Example: Strict class priority for service admission
 
 ```cpp
-int class_priority_pick(std::shared_ptr<des::event> trigger,
+int class_priority_pick(const std::shared_ptr<des::event>& trigger,
                         int server_idx,
                         const std::vector<std::vector<int>>& q_map,
                         const std::vector<std::shared_ptr<des::queue>>& queues,

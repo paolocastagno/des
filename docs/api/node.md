@@ -84,7 +84,7 @@ unsigned int service_length(unsigned int cls);
 ### Event Processing
 
 ```cpp
-bool arrival(std::shared_ptr<event>& e);
+bool arrival(const std::shared_ptr<event>& e);
 std::shared_ptr<event> departure();
 double next_event_time();             // earliest scheduled departure
 ```
@@ -96,7 +96,7 @@ double next_event_time();             // earliest scheduled departure
 ### Reset / Clear
 
 ```cpp
-void reset(double time, std::vector<std::string> keys, bool newrun);
+void reset(double time, std::vector<des::tag> keys, bool newrun);
 void clear();
 ```
 
@@ -124,19 +124,19 @@ Subclasses implement these to define how service times are drawn and how events 
 
 ```cpp
 virtual double get_service(unsigned int& cls, unsigned int& idx) = 0;
-virtual int schedule(std::shared_ptr<event>& e,
-                     std::vector<std::vector<int>> s_map) = 0;
-virtual int enqueue(std::shared_ptr<event>& e,
-                    std::vector<std::vector<int>> q_map) = 0;
-virtual int dequeue(std::shared_ptr<event>& e,
-                    std::vector<std::vector<int>> q_map) = 0;
+virtual int schedule(const std::shared_ptr<event>& e,
+                     const std::vector<std::vector<int>>& s_map) = 0;
+virtual int enqueue(const std::shared_ptr<event>& e,
+                    const std::vector<std::vector<int>>& q_map) = 0;
+virtual int dequeue(const std::shared_ptr<event>& e,
+                    const std::vector<std::vector<int>>& q_map) = 0;
 ```
 
 `service_pick_handler` is an optional function pointer used after a departure to choose which waiting queue should supply the next job:
 
 ```cpp
 using service_pick_handler =
-    int (*)(std::shared_ptr<event>,
+    int (*)(const std::shared_ptr<event>&,
             int server_idx,
             const std::vector<std::vector<int>>& queue_map,
             const std::vector<std::shared_ptr<queue>>& queues,

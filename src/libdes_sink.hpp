@@ -63,7 +63,7 @@ class des::sink : public des::sourcesink
 		 *
 		 * @return Always 0.
 		 */
-		int schedule(shared_ptr<event>& e, vector<vector<int>> s_map) override;
+		int schedule(const shared_ptr<event>& e, const vector<vector<int>>& s_map) override;
 		/**
 		 * @brief Select a waiting queue for a sink arrival.
 		 *
@@ -72,13 +72,13 @@ class des::sink : public des::sourcesink
 		 *
 		 * @return Always 0.
 		 */
-		int enqueue(shared_ptr<event>& e, vector<vector<int>> q_map) override;
+		int enqueue(const shared_ptr<event>& e, const vector<vector<int>>& q_map) override;
 		/**
 		 * @brief Dispose the completed event into the shared event pool.
 		 *
 		 * @return Always 0.
 		 */
-		int dequeue(shared_ptr<event>& e, vector<vector<int>> s_map) override;
+		int dequeue(const shared_ptr<event>& e, const vector<vector<int>>& s_map) override;
 		// Utility methods
 		/**
 		 * @brief Reset the sink and optionally snapshot attached observers.
@@ -90,7 +90,7 @@ class des::sink : public des::sourcesink
 		 * @param keys Additional event-info keys whose times should be shifted.
 		 * @param newrun When true, observers snapshot their current-run values.
 		 */
-		inline void reset(double value, vector<string> keys = vector<string>(), bool newrun = false) override
+		inline void reset(double value, vector<tag> keys = vector<tag>(), bool newrun = false) override
 		{
 			this -> sourcesink::reset(value, keys, newrun);
 		}

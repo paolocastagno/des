@@ -33,7 +33,7 @@ namespace des
 class des::node : public des::object, public des::observable
 {
 	public:
-		typedef int (*service_pick_handler)(shared_ptr<event>, int, const vector<vector<int>>&, const vector<shared_ptr<queue>>&, shared_ptr<mt19937_64>&);
+		typedef int (*service_pick_handler)(const shared_ptr<event>&, int, const vector<vector<int>>&, const vector<shared_ptr<queue>>&, shared_ptr<mt19937_64>&);
 		// Constructor & destructor
 		/**
 		 * @brief Construct a new node::node object. Each node object is characterized by one or more policy specifying how to handle events
@@ -185,7 +185,7 @@ class des::node : public des::object, public des::observable
 		 * @param e *const* pointer to the arriving
 		 * @return true if the event is allowed to get in the node, false otherwise
 		 */
-		bool arrival(shared_ptr<event>& e);
+		bool arrival(const shared_ptr<event>& e);
 		/**
 		 * @brief Handle a departure of the event *e* at time *time*.
 		 * 
@@ -205,7 +205,7 @@ class des::node : public des::object, public des::observable
 		 * 
 		 * @param time 
 		 */
-		void reset(double time, vector<string> keys = vector<string>(), bool newrun = false) override;
+		void reset(double time, vector<tag> keys = vector<tag>(), bool newrun = false) override;
 		/**
 		 * @brief Restore the node to the initial state
 		 * 
@@ -228,7 +228,7 @@ class des::node : public des::object, public des::observable
 			unordered_map<string, list<shared_ptr<observer>>>::iterator it = observable_events.find(signal);
 			if(it != observable_events.end())
 			{
-				for(shared_ptr<observer> obs: it -> second)
+				for(const shared_ptr<observer>& obs: it -> second)
 				{
 					obs.get()->update(msg);
 				}
@@ -270,27 +270,39 @@ class des::node : public des::object, public des::observable
 		 * @brief Handle a transition of a job from  the queue to the service  
 		 * 
 		 */
-		virtual int schedule(shared_ptr<event>& e, vector<vector<int>> s_map) = 0;
+		virtual int schedule(const shared_ptr<event>& e, const vector<vector<int>>& s_map) = 0;
 		/**
 		 * @brief Chooses one among the available queue for the current job
 		 * 
 		 * @return an integer used to index the right queue in the q_map structure.
 		 * 
 		 */
-		virtual int enqueue(shared_ptr<event>& e, vector<vector<int>> q_map) = 0;
+		virtual int enqueue(const shared_ptr<event>& e, const vector<vector<int>>& q_map) = 0;
 		/**
 		 * @brief Chooses from which queue to pick the next job among the available queues
 		 * 
 		 * @return an integer used to index the right queue in the s_map structure.
 		 */
-		virtual int dequeue(shared_ptr<event>& e, vector<vector<int>> s_map) = 0;
+		virtual int dequeue(const shared_ptr<event>& e, const vector<vector<int>>& s_map) = 0;
 		/**
 		 * @brief Default service selection handler. Returns the queue index selected by dequeue().
 		 */
-		virtual int shfunc(shared_ptr<event>& e, int sched, const vector<vector<int>>& qmap, const vector<shared_ptr<queue>>& queues, shared_ptr<mt19937_64>& g);
+		virtual int shfunc(const shared_ptr<event>& e, int sched, const vector<vector<int>>& qmap, const vector<shared_ptr<queue>>& queues, shared_ptr<mt19937_64>& g);
+		/**
+		 * @brief Tells whether server @p srv may serve jobs of class @p cls according to s_map.
+		 * Classes or servers missing from s_map are not restricted.
+		 */
+		inline bool can_serve(unsigned int srv, unsigned int cls) const
+		{
+			if(srv >= s_map.size() || cls >= s_map.at(srv).size())
+			{
+				return true;
+			}
+			return s_map.at(srv).at(cls) != 0;
+		}
 	private:
 		// ids generator
-		inline static unsigned int id_gen = 0;
+		inline static atomic<unsigned int> id_gen{0};
 		// Measures
         vector<long> in;
         vector<long> out;
@@ -300,6 +312,23 @@ class des::node : public des::object, public des::observable
 		 * @brief Optional custom callback used to select the queue index for the next job entering service.
 		 */
 		service_pick_handler handle_service_pick;
+		/**
+		 * @brief The node's signals, indexing @c signal_lists
+		 */
+		enum node_signal { SIG_ARRIVAL = 0, SIG_SERVICE = 1, SIG_DEPARTURE = 2 };
+		/**
+		 * @brief Observer lists of SIGNAL_NODE_ARRIVAL, SIGNAL_NODE_SERVICE and SIGNAL_NODE_DEPARTURE,
+		 *        resolved once (nullptr if the signal does not exist)
+		 */
+		list<shared_ptr<observer>>* signal_lists[3] = {nullptr, nullptr, nullptr};
+		/**
+		 * @brief The object @c signal_lists point into; a copied node re-resolves them
+		 */
+		const node* lists_owner = nullptr;
+		/**
+		 * @brief Notify the observers of signal @p which with a view of @p e's fields
+		 */
+		void notify_signal(node_signal which, const shared_ptr<event>& e);
 		// Utility methods
 		/**
 		 * @brief Updates counters for a new arrival

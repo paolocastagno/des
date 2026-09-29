@@ -74,7 +74,7 @@ namespace des
 	node::node(unsigned int cls, vector<shared_ptr<queue>> q_vec, vector<shared_ptr<queue>> s_vec, vector<vector<int>> qmap,
 			vector<vector<int>> smap, string description, shared_ptr<mt19937_64> g): node::node(description, g)
 	{
-		for(unsigned int i = 1; i < cls - 1; i++)
+		for(unsigned int i = 1; i < cls; i++)
 		{
 			in.push_back(0);
 			out.push_back(0);
@@ -98,9 +98,10 @@ namespace des
 		}
 	}
 
-	void node::reset(double time, vector<string> keys, bool newrun)
+	void node::reset(double time, vector<tag> keys, bool newrun)
 	{
-		keys.push_back(NODE_ARRIVAL);
+		keys.push_back(tags::NODE_ARRIVAL);
+		keys.push_back(tags::NODE_SERVICE_START);
 		for(unsigned int i = 0; i < in.size(); i++)
 		{
 			in.at(i) = in.at(i) - out.at(i);
@@ -211,16 +212,21 @@ namespace des
 		return min;
 	}
 
-	bool node::arrival(shared_ptr<event>& e)
+	bool node::arrival(const shared_ptr<event>& e)
 	{
 		// object::TraceLoc(source_location::current(), "ARRIVAL ", std::to_string(e->get_id()), " time ",
 		// 				 e->get_time(), " node ", std::to_string(get_id()));
 		unsigned int cls = e -> get_cls();
 		double time = e -> get_time();
-		// Handle the new arrival 
-		unsigned int sched = schedule(e, s_map);
+		// Handle the new arrival
+		int sched_idx = schedule(e, s_map);
+		if(sched_idx < 0)
+		{
+			throw runtime_error("node::arrival (node::id " + std::to_string(get_id()) +") no server is mapped to event class " + std::to_string(cls) + ". Check the node's server map.");
+		}
+		unsigned int sched = static_cast<unsigned int>(sched_idx);
 		// 0) add the arrival time to the event's information
-		e ->emplace_info(NODE_ARRIVAL, time);
+		e ->emplace_info(tags::NODE_ARRIVAL, time);
 		if(s.at(sched) -> is_full())
 		{
 			// object::TraceLoc(source_location::current(), "ENQUEUE ", std::to_string(e->get_id()), " time ",
@@ -235,14 +241,13 @@ namespace des
 				// 3) enqueue event in the selected queue
 				q.at(enq) -> enqueue(e, time);
 				// 4) add the queue index to the event's information
-				e ->emplace_info(EVENT_QUEUE, enq);
+				e ->emplace_info(tags::EVENT_QUEUE, enq);
 				// 5) add the arrival time to the event's information
-				// e ->emplace_info(NODE_ARRIVAL, time);
+				// e ->emplace_info(tags::NODE_ARRIVAL, time);
 				// 6) notify the arrival to observers
 				if(observers != 0)
 				{
-					message msg(e -> get_map_info());
-					notify(SIGNAL_NODE_ARRIVAL, msg);
+					notify_signal(SIG_ARRIVAL, e);
 				}
 				return true;
 			}
@@ -257,12 +262,12 @@ namespace des
 		{
 			// object::TraceLoc(source_location::current(), "SERVICE ", std::to_string(e->get_id()), " time ",
 			// 			 e->get_time(), " node ", std::to_string(get_id()));
-			e -> emplace_info(EVENT_SERVER, sched);
-			e -> emplace_info(NODE_SERVICE_START, time);
+			e -> emplace_info(tags::EVENT_SERVER, sched);
+			e -> emplace_info(tags::NODE_SERVICE_START, time);
 			// 1) set the final time
 			e -> set_time(time + get_service(cls, sched));
 			// 2) add the arrival time to the event's information
-			// e ->emplace_info(NODE_ARRIVAL, time);
+			// e ->emplace_info(tags::NODE_ARRIVAL, time);
 			// 3) update counters
 			update_in(cls, time); 
 			// 4) enqueue event in the selected queue
@@ -273,9 +278,8 @@ namespace des
 			// 5) notify the arrival to observers
 			if(observers != 0)
 			{
-				message msg(e -> get_map_info());
-				notify(SIGNAL_NODE_ARRIVAL, msg);
-				notify(SIGNAL_NODE_SERVICE, msg);
+				notify_signal(SIG_ARRIVAL, e);
+				notify_signal(SIG_SERVICE, e);
 			}
 			return true;
 		}
@@ -283,37 +287,39 @@ namespace des
 
 	shared_ptr<event> node::departure()
 	{
-		// Find the queue where holding the event to handle
-		int deq = idx_next_departure();
-		if(s.at(deq) -> in_queue() != 0)
+		// Find the server holding the event to handle
+		int srv = idx_next_departure();
+		if(s.at(srv) -> in_queue() != 0)
 		{
 			// Read the departure time before popping so time-aware policies
 			// (e.g. processor sharing) can update the remaining jobs in the server.
-			double time = s.at(deq) -> min_time();
+			double time = s.at(srv) -> min_time();
 			// Get the event (on_dequeue hook is called inside dequeue(time))
-			shared_ptr<event> e = s.at(deq) -> dequeue(time);
+			shared_ptr<event> e = s.at(srv) -> dequeue(time);
 			// object::TraceLoc(source_location::current(), "DEPARTURE ", std::to_string(e->get_id()), " time ",
 			// 				 e -> get_time(), " node ", std::to_string(get_id()));
 			// ..., its class id
 			unsigned int cls = e -> get_cls();
 			// Update counters
-			double arrival_time = e -> get_info(NODE_ARRIVAL).second;
-			pair<bool, double> service_start_info = e -> get_info(NODE_SERVICE_START);
+			double arrival_time = e -> get_info(tags::NODE_ARRIVAL).second;
+			pair<bool, double> service_start_info = e -> get_info(tags::NODE_SERVICE_START);
 			double service_start_time = service_start_info.first ? service_start_info.second : arrival_time;
-			e -> emplace_info(NODE_SOJOURN, time - arrival_time);
-			e -> emplace_info(NODE_WAIT, service_start_time - arrival_time);
-			e -> emplace_info(NODE_SERVICE, time - service_start_time);
+			e -> emplace_info(tags::NODE_SOJOURN, time - arrival_time);
+			e -> emplace_info(tags::NODE_WAIT, service_start_time - arrival_time);
+			e -> emplace_info(tags::NODE_SERVICE, time - service_start_time);
 			// notify the departure to observers
 			if(observers != 0)
 			{
-				message msg(e -> get_map_info());
-				notify(SIGNAL_NODE_DEPARTURE, msg);
+				notify_signal(SIG_DEPARTURE, e);
 			}
-			// Try to schedule another event in service
-			unsigned int sched = schedule(e, s_map);
+			// Try to schedule another event in service. Jobs only wait when every server
+			// their class may use is full, so the server just freed is the only one a
+			// waiting job can move to.
+			unsigned int sched = static_cast<unsigned int>(srv);
 			if(!s.at(sched) -> is_full())
 			{
 				// 1) Find the index of the queue to pick the next event to serve
+				int deq;
 				if(handle_service_pick != nullptr)
 				{
 					deq = handle_service_pick(e, static_cast<int>(sched), q_map, q, gen);
@@ -322,32 +328,35 @@ namespace des
 				{
 					deq = shfunc(e, static_cast<int>(sched), q_map, q, gen);
 				}
-				if(q.size() > 0 && q.at(deq) ->in_queue() != 0)
+				// 2) get the first event in the queue the freed server may serve
+				shared_ptr<event> ev = nullptr;
+				if(deq >= 0 && static_cast<unsigned int>(deq) < q.size())
 				{
-					// 2) get the event
-					shared_ptr<event> ev = q.at(deq) -> dequeue();
+					ev = q.at(deq) -> dequeue_next([this, sched](const event& w){ return can_serve(sched, static_cast<unsigned int>(w.get_cls())); }, time);
+				}
+				if(ev != nullptr)
+				{
 					// 3) Update counters
 					unsigned int mvcls = ev -> get_cls();
 					// 4) Set the final time
 					ev -> set_time(time + get_service(mvcls, sched));	
-					ev -> emplace_info(NODE_SERVICE_START, time);
+					ev -> emplace_info(tags::NODE_SERVICE_START, time);
 					// 5) Find the index of the serverSet the server id
-					ev -> emplace_info(EVENT_SERVER, sched);
+					ev -> emplace_info(tags::EVENT_SERVER, sched);
 					s.at(sched) -> enqueue(ev, time);
 					// notify that the job entered service
 					if(observers != 0)
 					{
-						message msg(ev -> get_map_info());
-						notify(SIGNAL_NODE_SERVICE, msg);
+						notify_signal(SIG_SERVICE, ev);
 					}
 					//.at(sched).at(mvcls);
 				}
 				update_out(cls, time);
 				// remove the queue id and server id from the event information
-				e -> remove_info(EVENT_QUEUE);
-				e -> remove_info(EVENT_SERVER);
-				e -> remove_info(NODE_ARRIVAL);
-				e -> remove_info(NODE_SERVICE_START);
+				e -> remove_info(tags::EVENT_QUEUE);
+				e -> remove_info(tags::EVENT_SERVER);
+				e -> remove_info(tags::NODE_ARRIVAL);
+				e -> remove_info(tags::NODE_SERVICE_START);
 				return e;
 			}
 			else
@@ -361,7 +370,31 @@ namespace des
 		}
 	}
 
-	int node::shfunc(shared_ptr<event>& e, int sched, const vector<vector<int>>& qmap, const vector<shared_ptr<queue>>& queues, shared_ptr<mt19937_64>& g)
+	void node::notify_signal(node_signal which, const shared_ptr<event>& e)
+	{
+		if(lists_owner != this)
+		{
+			const string* names[3] = {&SIGNAL_NODE_ARRIVAL, &SIGNAL_NODE_SERVICE, &SIGNAL_NODE_DEPARTURE};
+			for(int i = 0; i < 3; i++)
+			{
+				auto it = observable_events.find(*names[i]);
+				signal_lists[i] = it == observable_events.end() ? nullptr : &(it -> second);
+			}
+			lists_owner = this;
+		}
+		list<shared_ptr<observer>>* obs = signal_lists[which];
+		if(obs == nullptr || obs -> empty())
+		{
+			return;
+		}
+		message msg = message::view_of(e -> get_store());
+		for(const shared_ptr<observer>& o: *obs)
+		{
+			o -> update(msg);
+		}
+	}
+
+	int node::shfunc(const shared_ptr<event>& e, int sched, const vector<vector<int>>& qmap, const vector<shared_ptr<queue>>& queues, shared_ptr<mt19937_64>& g)
 	{
 		(void)sched;
 		(void)queues;
@@ -427,7 +460,7 @@ namespace des
 			{
 				thr += out.at(i);
 			}
-			thr = thr / t_max;
+			thr = t_max > 0 ? thr / t_max : 0.0;
 			str += "\t\t" + std::to_string(thr) + "\n";
 		}
 		return str;

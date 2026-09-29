@@ -106,7 +106,7 @@ template <typename TT, template <typename> typename T> class des::station : publ
 		 *  
 		 * @return int the index 
 		 */
-		int enqueue(shared_ptr<event>& e, vector<vector<int>> q_map) override;
+		int enqueue(const shared_ptr<event>& e, const vector<vector<int>>& q_map) override;
 		/**
 		 * @brief Returns the index of the queue where to dequeue the next job to handle
 		 * 
@@ -115,7 +115,7 @@ template <typename TT, template <typename> typename T> class des::station : publ
 		 *  
 		 * @return int the index 
 		 */
-		int dequeue(shared_ptr<event>& e, vector<vector<int>> q_map) override;
+		int dequeue(const shared_ptr<event>& e, const vector<vector<int>>& q_map) override;
 		/**
 		 * @brief Returns the index of the server where to schedule the next event
 		 * 
@@ -124,7 +124,15 @@ template <typename TT, template <typename> typename T> class des::station : publ
 		 *  
 		 * @return int the index 
 		 */
-		int schedule(shared_ptr<event>& e, vector<vector<int>> s_map) override;
+		int schedule(const shared_ptr<event>& e, const vector<vector<int>>& s_map) override;
+	protected:
+		/**
+		 * @brief Default choice of the queue feeding a freed server: one of the queues holding a job
+		 * that server @p sched may serve (according to s_map), picked uniformly at random
+		 *
+		 * @return int the queue index, or -1 if no waiting job can use the server
+		 */
+		int shfunc(const shared_ptr<event>& e, int sched, const vector<vector<int>>& qmap, const vector<shared_ptr<queue>>& queues, shared_ptr<mt19937_64>& g) override;
 	private:
 		/**
 		 * @brief Data structure of size m * n, where m are the number of server in the queue and n is the number of jobs' classes
