@@ -2,15 +2,17 @@
 
 **Header:** `libdes_const.hpp`
 
-All string constants used as info-map keys, message keys, and signal names.
+The fields reserved by the library and the signal names.
+
+The event info and node timing fields are [tags](tags.md) (`des::tag`), aliases of the predefined `des::tags` with the same identifier (e.g. `NODE_ARRIVAL` is `des::tags::NODE_ARRIVAL`). The *Name* column is the name each tag has in `des::tag_registry`, used by `message::serialize()` and `event::to_string()`; these names are reserved, so `des::tag_registry::define()` rejects them.
 
 ---
 
 ## Event Info Keys
 
-These keys are set in the `des::event` info map.
+These fields are set in the `des::event` info fields.
 
-| Constant | Value | Description |
+| Constant | Name | Description |
 |---|---|---|
 | `EVENT_ID` | `"id"` | Unique event identifier |
 | `EVENT_CLS` | `"class"` | Event class index |
@@ -26,9 +28,9 @@ These keys are set in the `des::event` info map.
 
 ## Node Timing Keys
 
-These keys appear in `des::message` payloads sent to observers.
+These fields appear in `des::message` payloads sent to observers.
 
-| Constant | Value | Description |
+| Constant | Name | Description |
 |---|---|---|
 | `NODE_ARRIVAL` | `"arrival_time"` | Absolute arrival time at the node |
 | `NODE_SERVICE_START` | `"service_start_time"` | Time service began |
@@ -47,7 +49,10 @@ Passed to `observable::attach()` and `observable::notify()`.
 | `SIGNAL_NODE_ARRIVAL` | `"node_arrival"` | Fired on event arrival at a node |
 | `SIGNAL_NODE_DEPARTURE` | `"node_departure"` | Fired on event departure from a node |
 | `SIGNAL_NODE_SERVICE` | `"node_service"` | Fired when an event enters service |
-| `SIGNAL_NET_ROUTING` | `"net_route"` | Prefix for network routing signals |
+| `SIGNAL_NET_ROUTING` | `"net_route"` | Prefix for network routing signals (`net_route_<src>_<dst>`), fired when an event is accepted by `dst` |
+| `SIGNAL_NET_FLOW` | `"net_flow"` | Prefix for per-edge throughput signals (`net_flow_<src>_<dst>`), fed once per run by `network::reset()` |
+| `SIGNAL_NET_BLOCK` | `"net_block"` | Prefix for per-edge blocking signals (`net_block_<src>_<dst>`), fired when `dst` refuses an event |
+| `SIGNAL_NET_LOSS` | `"net_loss"` | Prefix for per-node loss signals (`net_loss_<src>`), fired when an event leaving `src` is dropped because no destination accepted it |
 
 ---
 

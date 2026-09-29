@@ -2,90 +2,83 @@
 #define UTILCONST_H
 #include <string>
 
+#include "libdes_tag.hpp"
+
 using namespace std;
 
-// Event's constants
+// Event's fields
+// Tags of the fields reserved by the library (aliases of des::tags; their registry names
+// are given in docs/api/constants.md).
 /**
- * @brief Key used to lookup for the event id in the data structure Event::info 
+ * @brief Field holding the event id
  * 
  */
-const string EVENT_ID = "id";
+inline constexpr des::tag EVENT_ID = des::tags::EVENT_ID;
 /**
- * @brief Key used to lookup for the event class in the data structure Event::info 
+ * @brief Field holding the event class
  * 
  */
-const string EVENT_CLS = "class";
+inline constexpr des::tag EVENT_CLS = des::tags::EVENT_CLS;
 /**
- * @brief Key used to lookup for the event end time in the data structure Event::info 
+ * @brief Field holding the time the event will happen (use event::set_time/get_time)
  * 
  */
-const string EVENT_TIME = "time";
-
+inline constexpr des::tag EVENT_TIME = des::tags::EVENT_TIME;
 /**
- * @brief Key used to lookup for the event end constraint in the data structure Event::info 
+ * @brief Field holding the event constraint (use event::set_constraint/get_constraint)
  * 
  */
-const string EVENT_CONSTRAINT = "constraint";
-
+inline constexpr des::tag EVENT_CONSTRAINT = des::tags::EVENT_CONSTRAINT;
 /**
- * @brief Key used to override the routing matrix
+ * @brief Field used to override the routing matrix
  * 
  */
-const string EVENT_REROUTE = "reroute";
-
+inline constexpr des::tag EVENT_REROUTE = des::tags::EVENT_REROUTE;
 /**
- * @brief Key used to lookup the int id (or index) of the current node  
+ * @brief Field holding the index of the current node
  * 
  */
-const string EVENT_NODE = "node";
-
+inline constexpr des::tag EVENT_NODE = des::tags::EVENT_NODE;
 /**
- * @brief Key used to lookup the index of the queue in the current node  
+ * @brief Field holding the index of the queue in the current node
  * 
  */
-const string EVENT_QUEUE = "queue_idx";
-
+inline constexpr des::tag EVENT_QUEUE = des::tags::EVENT_QUEUE;
 /**
- * @brief Key used to lookup the index of the queue in the current node  
+ * @brief Field holding the index of the server in the current node
  * 
  */
-const string EVENT_SERVER = "server_idx";
-
+inline constexpr des::tag EVENT_SERVER = des::tags::EVENT_SERVER;
 /**
- * @brief Key with used to lookup the int id (or index) of the current node  
+ * @brief Field set to 1 when the event was refused by a destination
  * 
  */
-const string EVENT_REJECT = "reject";
-
+inline constexpr des::tag EVENT_REJECT = des::tags::EVENT_REJECT;
 /**
- * @brief Key used to lookup the arrival time at the current node  
+ * @brief Field holding the arrival time at the current node
  * 
  */
-const string NODE_ARRIVAL = "arrival_time";
-
+inline constexpr des::tag NODE_ARRIVAL = des::tags::NODE_ARRIVAL;
 /**
- * @brief Key used to lookup the time at which service started in the current node
+ * @brief Field holding the time at which service started in the current node
  * 
  */
-const string NODE_SERVICE_START = "service_start_time";
-
+inline constexpr des::tag NODE_SERVICE_START = des::tags::NODE_SERVICE_START;
 /**
- * @brief Key used to lookup the arrival time at the current node  
+ * @brief Field holding the time spent in the last node visited (wait + service)
  * 
  */
-const string NODE_SOJOURN = "node_sojourn";
-
+inline constexpr des::tag NODE_SOJOURN = des::tags::NODE_SOJOURN;
 /**
- * @brief Key used to lookup the waiting time experienced in the current node
+ * @brief Field holding the waiting time experienced in the last node visited
  * 
  */
-const string NODE_WAIT = "node_wait";
-
+inline constexpr des::tag NODE_WAIT = des::tags::NODE_WAIT;
 /**
- * @brief Key used to lookup the service time experienced in the current node
+ * @brief Field holding the service time experienced in the last node visited
  * 
  */
-const string NODE_SERVICE = "node_service";
+inline constexpr des::tag NODE_SERVICE = des::tags::NODE_SERVICE;
 
 /**
  * @brief Signal: arrival in the node
@@ -108,6 +101,21 @@ const string SIGNAL_NODE_SERVICE = "node_service";
  * 
  */
 const string SIGNAL_NET_ROUTING = "net_route";
+/**
+ * @brief Signal prefix: per-run throughput of an edge, fed once per run by network::reset()
+ *
+ */
+const string SIGNAL_NET_FLOW = "net_flow";
+/**
+ * @brief Signal prefix: an event was refused by the destination of an edge
+ *
+ */
+const string SIGNAL_NET_BLOCK = "net_block";
+/**
+ * @brief Signal prefix: an event departing a node was lost because no destination accepted it
+ *
+ */
+const string SIGNAL_NET_LOSS = "net_loss";
 /**
  * @brief Separator used between key and value
  * 
