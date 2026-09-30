@@ -9,6 +9,7 @@
 #include <libdes_histogram.hpp>
 #include <libdes_message.hpp>
 #include <libdes_observable.hpp>
+#include <libdes_ratio.hpp>
 #include <libdes_sample.hpp>
 #include <libdes_scalar.hpp>
 #include <libdes_sink.hpp>
@@ -75,11 +76,79 @@ TEST_CASE("without enough runs the interval is unbounded", "[unit][observer]")
 	des::counter c("c", 1);
 	des::scalar s("s", 1);
 	des::sample m("m", 1);
-	for(auto ci : {c.confidence_interval(0.05, 0), s.confidence_interval(0.05, 0), m.confidence_interval(0.05, 0)})
+	des::ratio r("r", 1);
+	r.update(1.0, 2.0, 0);   // one pair: no interval within the run either
+	for(auto ci : {c.confidence_interval(0.05, 0), s.confidence_interval(0.05, 0), m.confidence_interval(0.05, 0),
+				   r.confidence_interval(0.05, 0), r.run_confidence_interval(0.05, 0)})
 	{
 		CHECK_EQ(ci.first, -__DBL_MAX__);
 		CHECK_EQ(ci.second, __DBL_MAX__);
 	}
+}
+
+TEST_CASE("ratio: estimate and interval within a run", "[unit][observer]")
+{
+	des::ratio r("throughput", 2);
+	for(auto [x, y] : std::vector<std::pair<double, double>>{{1, 2}, {3, 4}, {2, 2}, {6, 8}}) r.update(x, y, 0);
+	CHECK_EQ(r.n_updates(0), 4);
+	CHECK_EQ(r.n_updates(1), 0);
+	CHECK_NEAR(r.get(0), 0.75, 1e-12);                 // 12 / 16
+	CHECK_EQ(r.get(1), 0.0);                           // no pairs yet
+	// x - 0.75 y = {-0.5, 0, 0.5, 0}: s^2 = 0.5 / 3; half-width t(0.975, 3) * s / (4 * 2)
+	auto ci = r.run_confidence_interval(0.05, 0);
+	CHECK_NEAR(ci.first, 0.587596467, 1e-6);
+	CHECK_NEAR(ci.second, 0.912403533, 1e-6);
+}
+
+TEST_CASE("ratio: the interval accounts for the covariance of x and y", "[unit][observer]")
+{
+	// x and y vary, but x = 2y in every pair: the ratio is exactly 2
+	des::ratio r("r", 1);
+	for(double y : {1.0, 3.0, 5.0, 2.0}) r.update(2 * y, y, 0);
+	auto ci = r.run_confidence_interval(0.05, 0);
+	CHECK_NEAR(ci.first, 2.0, 1e-12);
+	CHECK_NEAR(ci.second, 2.0, 1e-12);
+}
+
+TEST_CASE("ratio: online moments match a two-pass computation", "[unit][observer]")
+{
+	// Large, nearly equal values, where sums of squares would lose the variance to cancellation
+	std::vector<std::pair<double, double>> pairs;
+	for(int i = 0; i < 1000; i++) pairs.push_back({1e8 + (i * 7919) % 13, 2e8 + (i * 104729) % 17});
+	des::ratio r("r", 1);
+	double sx = 0, sy = 0;
+	for(auto [x, y] : pairs) { r.update(x, y, 0); sx += x; sy += y; }
+	const double k = static_cast<double>(pairs.size()), q = sx / sy;
+	double s2 = 0;
+	for(auto [x, y] : pairs) s2 += (x - q * y) * (x - q * y);
+	s2 /= k - 1;
+	const double half = student_t_quantile(0.975, k - 1) * std::sqrt(s2) / (sy / k * std::sqrt(k));
+	auto ci = r.run_confidence_interval(0.05, 0);
+	CHECK_NEAR(r.get(0), q, 1e-15);
+	CHECK_NEAR(ci.second - ci.first, 2 * half, 1e-6 * half);
+}
+
+TEST_CASE("ratio: completed runs and the interval across runs", "[unit][observer]")
+{
+	des::ratio r("r", 2);
+	for(auto [x, y] : std::vector<std::pair<double, double>>{{1, 2}, {3, 4}, {2, 2}, {6, 8}}) r.update(x, y, 0);
+	r.reset(true);                                     // run estimate 0.75
+	CHECK_EQ(r.n_updates(0), 0);
+	r.update(1, 2, 0);
+	r.update(2, 4, 0);
+	r.reset(true);                                     // run estimate 0.5
+	r.update(9, 1, 0);
+	r.reset(false);                                    // discarded, e.g. a warm-up
+	CHECK_EQ(r.completed_runs(0), 2u);
+	CHECK_EQ(r.completed_runs(1), 0u);                 // a class without pairs stores nothing
+	CHECK_NEAR(r.get_ratio(0), 0.625, 1e-12);
+	// {0.75, 0.5}: mean 0.625, s = 0.176777, t(0.975, 1) = 12.706205
+	auto ci = r.confidence_interval(0.05, 0);
+	CHECK_NEAR(ci.first, -0.963275592, 1e-6);
+	CHECK_NEAR(ci.second, 2.213275592, 1e-6);
+	CHECK_EQ(r.confidence_interval(0.05).size(), 2u);
+	r.clear();
+	CHECK_EQ(r.completed_runs(0), 0u);
 }
 
 TEST_CASE("sample keeps every observation", "[unit][observer]")
@@ -121,6 +190,7 @@ TEST_CASE("observers built without a field reject messages", "[unit][observer]")
 	CHECK_THROWS_AS(std::logic_error, des::scalar("flow", 1).update(m));
 	CHECK_THROWS_AS(std::logic_error, des::sample("x", 1).update(m));
 	CHECK_THROWS_AS(std::logic_error, des::histogram("x", 1).update(m));
+	CHECK_THROWS_AS(std::logic_error, des::ratio("x", 1).update(m));
 	des::scalar fed("flow", 1);
 	fed.update(1.5, 0);
 	CHECK_EQ(fed.mean(0), 1.5);

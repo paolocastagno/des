@@ -1,6 +1,6 @@
 # Observers
 
-Observers implement the measurement layer. They are attached to an `observable` node on a named signal and receive a `des::message` each time that signal fires. The library ships four concrete observer types.
+Observers implement the measurement layer. They are attached to an `observable` node on a named signal and receive a `des::message` each time that signal fires. The library ships five concrete observer types: four measure the notified events, and `des::ratio` is fed directly with pairs of values, e.g. from the regeneration cycles of a run.
 
 `scalar`, `sample` and `histogram` measure one field of the notified event, given as a [tag](tags.md) when they are built (e.g. `NODE_SOJOURN`, or a tag from `des::tag_registry::define()`); they are then named after that field. Built with a description instead, they measure nothing by themselves and are fed directly with `update(value, cls)`; notifying them a message throws `std::logic_error`.
 
@@ -222,6 +222,58 @@ void reset(bool newrun);          // newrun=true stores the current buckets as a
 void reset(int cls, bool newrun);
 void clear();                     // clears current buckets; completed-run data is preserved
 ```
+
+---
+
+## des::ratio
+
+**Header:** `libdes_ratio.hpp`
+
+Estimates a ratio of sums, r = Σx / Σy, from independent pairs (x, y). Its typical use is the **regenerative method**: the cycles between two regeneration points of a model are independent and identically distributed, and each contributes one pair. The pair can be, for example, the jobs a station served in the cycle and the cycle's length, which gives the throughput. It can also be the sojourn times summed over the cycle and the jobs served in it, which gives the mean sojourn time.
+
+Because x and y are correlated (longer cycles serve more jobs), the variance of r depends on their covariance, which a pair of `scalar`s cannot provide. The ratio keeps the means and co-moments of x and y with Welford's online algorithm. The confidence interval of the current run is
+
+r ± t<sub>1−α/2, k−1</sub> · s / (ȳ · √k),  with s² = Σ(x − r·y)² / (k − 1),
+
+where k is the number of pairs and ȳ = Σy / k.
+
+A ratio reads no message field: it is fed with `update(x, y, cls)` only, and notifying it a message throws `std::logic_error`.
+
+### Constructor
+
+```cpp
+ratio(const std::string& description, int n_classes);
+```
+
+### Updating
+
+```cpp
+void update(double x, double y, int cls);   // add one pair to the current run of class cls
+```
+
+### Reading
+
+```cpp
+double get(int cls);                // current-run estimate Σx / Σy (0 while Σy is 0)
+long   n_updates(int cls);          // pairs in the current run
+std::pair<double,double> run_confidence_interval(double alpha, int cls);   // within the current run
+double get_ratio(int cls);          // mean of the completed-run estimates
+size_t completed_runs(int cls);
+std::pair<double,double> confidence_interval(double alpha, int cls);       // across completed runs
+std::vector<std::pair<double,double>> confidence_interval(double alpha);
+```
+
+Both intervals are unbounded, `[-DBL_MAX, DBL_MAX]`, until there are at least two pairs (within a run) or two completed runs (across runs).
+
+### Reset
+
+```cpp
+void reset(bool newrun);            // newrun=true stores each class's current-run estimate
+void reset(int cls, bool newrun);
+void clear();                       // discard the current run and the completed-run estimates
+```
+
+A ratio is not attached to a node, so `network::reset()` does not reach it: call `reset(true)` at the end of each run. [A first model](../../README.md#a-first-model) ends each run at a regeneration point once `run_confidence_interval()` is narrow enough, then adds runs until `confidence_interval()` is.
 
 ---
 
