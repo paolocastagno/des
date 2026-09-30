@@ -7,7 +7,7 @@ namespace des
 		s_map(),
 		q(),
 		s(),
-		gen(),
+		streams(),
 		in(),
 		out(),
 		usage(),
@@ -44,23 +44,7 @@ namespace des
 		set_sid(desc);
 	}
 
-	node::node(string desc, shared_ptr<mt19937_64> g) : node::node(desc)
-	{
-		gen = g;
-	}
-
 	node::node(string desc, int cls) : node::node(desc)
-	{
-		for(int i = 1; i < cls; i++)
-		{
-			in.push_back(0);
-			out.push_back(0);
-			last_event.push_back(0);
-			usage.push_back(0);
-		}
-	}
-	
-	node::node(string desc, int cls, shared_ptr<mt19937_64> g) : node::node(desc, g)
 	{
 		for(int i = 1; i < cls; i++)
 		{
@@ -72,7 +56,7 @@ namespace des
 	}
 
 	node::node(unsigned int cls, vector<shared_ptr<queue>> q_vec, vector<shared_ptr<queue>> s_vec, vector<vector<int>> qmap,
-			vector<vector<int>> smap, string description, shared_ptr<mt19937_64> g): node::node(description, g)
+			vector<vector<int>> smap, string description): node::node(description)
 	{
 		for(unsigned int i = 1; i < cls; i++)
 		{
@@ -85,9 +69,10 @@ namespace des
 		s = s_vec;
 		q_map = qmap;
 		s_map = smap;
+		refresh_next();
 	}
 
-	node::node(unsigned int cls, string description, shared_ptr<mt19937_64> g) : node::node(description, g)
+	node::node(unsigned int cls, string description) : node::node(description)
 	{
 		for(unsigned int i = 1; i < cls; i++)
 		{
@@ -131,6 +116,7 @@ namespace des
 				obs -> reset(newrun);
 			}
 		}
+		refresh_next();
 	}
 
 	void node::clear()
@@ -157,6 +143,7 @@ namespace des
 				obs -> clear();
 			}
 		}
+		refresh_next();
 	}
 
 	void node::update_in(unsigned int& cls, double& time)
@@ -187,9 +174,19 @@ namespace des
 
 	int node::idx_next_departure() const
 	{
+		return next_server;
+	}
+
+	double node::next_event_time() const
+	{
+		return next_time;
+	}
+
+	void node::refresh_next()
+	{
 		double min = __DBL_MAX__;
 		int idx = 0, idx_min = 0;
-		for(shared_ptr<queue> server: s)
+		for(const shared_ptr<queue>& server: s)
 		{
 			if(server -> in_queue() != 0 && server -> min_time() < min)
 			{
@@ -198,18 +195,8 @@ namespace des
 			}
 			++idx;
 		}
-		return idx_min;
-	}
-
-	double node::next_event_time() const
-	{
-		double min = __DBL_MAX__;
-		for(shared_ptr<queue> server : s)
-		{
-			if(server -> in_queue() != 0 && server -> min_time() < min)
-				min = server -> min_time();
-		}
-		return min;
+		next_time = min;
+		next_server = idx_min;
 	}
 
 	bool node::arrival(const shared_ptr<event>& e)
@@ -275,6 +262,7 @@ namespace des
 			{
 				throw runtime_error("node::arrival (node::id " + std::to_string(get_id()) +") error scheduling of the current event in queue.\n" + e ->to_string());
 			}
+			refresh_next();
 			// 5) notify the arrival to observers
 			if(observers != 0)
 			{
@@ -283,6 +271,35 @@ namespace des
 			}
 			return true;
 		}
+	}
+
+	void node::pass_through(const shared_ptr<event>& e)
+	{
+		unsigned int cls = e -> get_cls();
+		double time = e -> get_time();
+		// Arrival straight into service, as arrival() does
+		e -> emplace_info(tags::NODE_ARRIVAL, time);
+		e -> emplace_info(tags::EVENT_SERVER, 0);
+		e -> emplace_info(tags::NODE_SERVICE_START, time);
+		update_in(cls, time);
+		if(observers != 0)
+		{
+			notify_signal(SIG_ARRIVAL, e);
+			notify_signal(SIG_SERVICE, e);
+		}
+		// Departure at the same time, as departure() does
+		e -> emplace_info(tags::NODE_SOJOURN, 0.0);
+		e -> emplace_info(tags::NODE_WAIT, 0.0);
+		e -> emplace_info(tags::NODE_SERVICE, 0.0);
+		if(observers != 0)
+		{
+			notify_signal(SIG_DEPARTURE, e);
+		}
+		update_out(cls, time);
+		e -> remove_info(tags::EVENT_QUEUE);
+		e -> remove_info(tags::EVENT_SERVER);
+		e -> remove_info(tags::NODE_ARRIVAL);
+		e -> remove_info(tags::NODE_SERVICE_START);
 	}
 
 	shared_ptr<event> node::departure()
@@ -322,11 +339,11 @@ namespace des
 				int deq;
 				if(handle_service_pick != nullptr)
 				{
-					deq = handle_service_pick(e, static_cast<int>(sched), q_map, q, gen);
+					deq = handle_service_pick(e, static_cast<int>(sched), q_map, q, choice_stream());
 				}
 				else
 				{
-					deq = shfunc(e, static_cast<int>(sched), q_map, q, gen);
+					deq = shfunc(e, static_cast<int>(sched), q_map, q, choice_stream());
 				}
 				// 2) get the first event in the queue the freed server may serve
 				shared_ptr<event> ev = nullptr;
@@ -357,6 +374,7 @@ namespace des
 				e -> remove_info(tags::EVENT_SERVER);
 				e -> remove_info(tags::NODE_ARRIVAL);
 				e -> remove_info(tags::NODE_SERVICE_START);
+				refresh_next();
 				return e;
 			}
 			else
@@ -394,7 +412,7 @@ namespace des
 		}
 	}
 
-	int node::shfunc(const shared_ptr<event>& e, int sched, const vector<vector<int>>& qmap, const vector<shared_ptr<queue>>& queues, shared_ptr<mt19937_64>& g)
+	int node::shfunc(const shared_ptr<event>& e, int sched, const vector<vector<int>>& qmap, const vector<shared_ptr<queue>>& queues, random_engine& g)
 	{
 		(void)sched;
 		(void)queues;

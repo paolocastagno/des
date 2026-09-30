@@ -8,6 +8,7 @@
 #include <limits>
 #include <memory>
 #include <random>
+#include <string>
 #include <vector>
 
 #include <libdes_const.hpp>
@@ -28,14 +29,13 @@ namespace des_models
 	/** Station with deterministic service times, see fixed(). */
 	using det_station = des::station<double, std::uniform_real_distribution>;
 	using det_dists = std::vector<std::vector<std::shared_ptr<std::uniform_real_distribution<double>>>>;
+	/** Source of a Poisson arrival stream, see poisson_source(). */
+	using exp_source = des::source<double, std::exponential_distribution>;
+	/** Source with deterministic inter-arrival times, see fixed(). */
+	using det_source = des::source<double, std::uniform_real_distribution>;
 	using routing_t = std::vector<std::vector<std::vector<double>>>;
 
 	constexpr unsigned int UNLIMITED = std::numeric_limits<unsigned int>::max();
-
-	inline std::shared_ptr<std::mt19937_64> engine(unsigned long long seed)
-	{
-		return std::make_shared<std::mt19937_64>(seed);
-	}
 
 	/** Exponential distribution with rate @p rate. */
 	inline std::shared_ptr<std::exponential_distribution<double>> expo(double rate)
@@ -47,6 +47,15 @@ namespace des_models
 	inline std::shared_ptr<std::uniform_real_distribution<double>> fixed(double v)
 	{
 		return std::make_shared<std::uniform_real_distribution<double>>(v, v);
+	}
+
+	/** Source of Poisson arrivals of rate @p rates[c] for each class c. */
+	inline std::shared_ptr<exp_source> poisson_source(const std::vector<double>& rates, const std::string& name)
+	{
+		std::vector<std::shared_ptr<std::exponential_distribution<double>>> d;
+		for(double r : rates)
+			d.push_back(expo(r));
+		return std::make_shared<exp_source>(d, name);
 	}
 
 	/** Event of class @p cls at time @p t, owned by node @p node. */
@@ -83,8 +92,7 @@ namespace des_models
 	 */
 	struct open_model
 	{
-		std::shared_ptr<std::mt19937_64> gen;
-		std::shared_ptr<des::source> src;
+		std::shared_ptr<exp_source> src;
 		std::vector<std::shared_ptr<des::node>> stations;
 		std::shared_ptr<des::sink> snk;
 		std::vector<std::shared_ptr<des::scalar>> sojourn;   ///< one per station
@@ -93,15 +101,15 @@ namespace des_models
 
 		/**
 		 * @param lambda  arrival rate per class
-		 * @param make    builds the stations, given the shared engine
+		 * @param seed    seed of the network's random streams
+		 * @param make    builds the stations
 		 */
 		open_model(std::vector<double> lambda, unsigned long long seed,
-				   const std::function<std::vector<std::shared_ptr<des::node>>(std::shared_ptr<std::mt19937_64>)>& make)
-			: gen(engine(seed))
+				   const std::function<std::vector<std::shared_ptr<des::node>>()>& make)
 		{
 			int classes = static_cast<int>(lambda.size());
-			src = std::make_shared<des::source>(lambda, "source", gen);
-			stations = make(gen);
+			src = poisson_source(lambda, "source");
+			stations = make();
 			snk = std::make_shared<des::sink>("sink", classes);
 			std::vector<std::shared_ptr<des::node>> nodes{src};
 			std::vector<int> next{1};
@@ -115,7 +123,7 @@ namespace des_models
 			}
 			nodes.push_back(snk);
 			next.push_back(-1);
-			net = std::make_unique<des::network>(nodes, chain(next, classes), gen);
+			net = std::make_unique<des::network>(nodes, chain(next, classes), seed);
 			for(int c = 0; c < classes; c++)
 				src -> arrival(make_event(c, 0.0, 0));
 		}
@@ -145,10 +153,10 @@ namespace des_models
 	};
 
 	/** Single-class M/M/c/K-like station: c servers, one waiting queue of @p places places. */
-	inline std::shared_ptr<des::node> mm_station(std::shared_ptr<std::mt19937_64> g, double mu, unsigned int servers = 1, unsigned int places = INT_MAX)
+	inline std::shared_ptr<des::node> mm_station(double mu, unsigned int servers = 1, unsigned int places = INT_MAX)
 	{
 		exp_dists d(servers, {expo(mu)});
-		return std::make_shared<exp_station>(d, servers, 1, 1, places, "station", g);
+		return std::make_shared<exp_station>(d, servers, 1, 1, places, "station");
 	}
 }
 

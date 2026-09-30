@@ -47,10 +47,8 @@ Concrete subclasses must implement the four protected pure-virtual methods (`get
 ```cpp
 node();
 node(std::string description);
-node(std::string description, std::shared_ptr<std::mt19937_64> g);
 node(std::string description, int cls);
-node(std::string description, int cls, std::shared_ptr<std::mt19937_64> g);
-node(unsigned int cls, std::string description, std::shared_ptr<std::mt19937_64> g);
+node(unsigned int cls, std::string description);
 
 // Full constructor
 node(unsigned int cls,
@@ -58,9 +56,16 @@ node(unsigned int cls,
      std::vector<std::shared_ptr<des::queue>> servers,
      std::vector<std::vector<int>> queue_map,
      std::vector<std::vector<int>> server_map,
-     std::string description,
-     std::shared_ptr<std::mt19937_64> g);
+     std::string description);
 ```
+
+### Random Streams
+
+```cpp
+void set_streams(const des::random_engine& block);
+```
+
+Each node draws from its own block of disjoint streams of the xoshiro256** generator (`libdes_random.hpp`): stream 0 for its choices among queues and servers, stream `1 + c` for the service times of class `c`. Subclasses reach them through the protected `choice_stream()` and `service_stream(cls)`. The [network](network.md#random-streams) assigns every node its block when it is constructed; call `set_streams` afterwards to choose another one. A node outside a network draws from the block of a default-seeded engine.
 
 ### Queue Configuration
 
@@ -84,12 +89,14 @@ unsigned int service_length(unsigned int cls);
 ### Event Processing
 
 ```cpp
-bool arrival(const std::shared_ptr<event>& e);
+virtual bool arrival(const std::shared_ptr<event>& e);
 std::shared_ptr<event> departure();
 double next_event_time();             // earliest scheduled departure
 ```
 
-`arrival()` places the incoming event into a waiting queue, or directly into a server if one is free, and fires `SIGNAL_NODE_ARRIVAL`. It returns `false` when the event cannot be admitted because both service and waiting capacity are unavailable.
+`arrival()` places the incoming event into a waiting queue, or directly into a server if one is free, and fires `SIGNAL_NODE_ARRIVAL`. It returns `false` when the event cannot be admitted because both service and waiting capacity are unavailable. It is virtual: a subclass can handle arrivals differently, as `des::sink` does to absorb jobs without scheduling a departure (the protected helper `pass_through()` records an arrival and an immediate departure, with the usual counters, tags and signals).
+
+`next_event_time()` is kept up to date as jobs enter and leave the servers, so the network can query it at no cost.
 
 `departure()` removes the earliest event from the server queue, fires `SIGNAL_NODE_DEPARTURE`, and optionally pulls the next waiting event into service. If another event enters service, `SIGNAL_NODE_SERVICE` is fired for that event.
 
@@ -140,5 +147,5 @@ using service_pick_handler =
             int server_idx,
             const std::vector<std::vector<int>>& queue_map,
             const std::vector<std::shared_ptr<queue>>& queues,
-            std::shared_ptr<std::mt19937_64>& gen);
+            des::random_engine& g);
 ```

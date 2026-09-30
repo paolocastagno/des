@@ -14,7 +14,7 @@
 | `TT` | Numeric type for service-time samples (usually `double`) |
 | `T` | Distribution template (e.g. `exponential_distribution`, `piecewise_constant_distribution`) |
 
-Any distribution from `<random>` that has an `operator()(RNG&)` returning `TT` is compatible.
+Any distribution from `<random>` that has an `operator()(RNG&)` returning `TT` is compatible. Service times of class `c` are drawn from the station's own class-`c` stream (see [random streams](node.md#random-streams)).
 
 ---
 
@@ -26,8 +26,7 @@ station(std::vector<std::vector<std::shared_ptr<T<TT>>>> dist,
         unsigned int server_capacity,
         unsigned int n_queues,
         unsigned int queue_capacity,
-        std::string  description,
-        std::shared_ptr<std::mt19937_64> gen);
+        std::string  description);
 
 station(std::vector<std::vector<std::shared_ptr<T<TT>>>> dist,
         unsigned int n_servers,
@@ -36,15 +35,13 @@ station(std::vector<std::vector<std::shared_ptr<T<TT>>>> dist,
         unsigned int queue_capacity,
         std::shared_ptr<des::policy> queue_policy,
         std::shared_ptr<des::policy> server_policy,
-        std::string  description,
-        std::shared_ptr<std::mt19937_64> gen);
+        std::string  description);
 
 station(std::vector<std::vector<std::shared_ptr<T<TT>>>> dist,
         unsigned int n_servers,
         unsigned int server_capacity,
         std::shared_ptr<des::policy> server_policy,
-        std::string description,
-        std::shared_ptr<std::mt19937_64> gen);
+        std::string description);
 ```
 
 | Parameter | Description |
@@ -57,9 +54,8 @@ station(std::vector<std::vector<std::shared_ptr<T<TT>>>> dist,
 | `queue_policy` | Queue policy for waiting queues (`des::fifo` by default) |
 | `server_policy` | Queue policy for server queues (`des::fifo`, `des::is`, `des::ps`, etc.) |
 | `description` | Human-readable label |
-| `gen` | Shared RNG |
 
-Additional overloads accept a custom service-pick handler, omit the waiting queues for server-only stations, or use `station(dist, description, gen)` as a one-server infinite-server-style convenience constructor.
+Additional overloads accept a custom service-pick handler, omit the waiting queues for server-only stations, or use `station(dist, description)` as a one-server infinite-server-style convenience constructor.
 
 ---
 
@@ -90,12 +86,12 @@ int service_pick_handler(const std::shared_ptr<des::event>& trigger,
                          int server_idx,
                          const std::vector<std::vector<int>>& q_map,
                          const std::vector<std::shared_ptr<des::queue>>& queues,
-                         std::shared_ptr<std::mt19937_64>& gen);
+                         des::random_engine& g);
 ```
 
 `server_idx` is the server that has just been freed. The node then moves into it the first job of the returned queue, in that queue's release order, whose class the server may serve (according to the server map); returning `-1`, or a queue without such a job, leaves the server idle.
 
-If no handler is provided, `des::station` picks uniformly at random among the waiting queues holding at least one job the freed server may serve.
+`g` is the station's stream for its choices among queues and servers. If no handler is provided, `des::station` picks uniformly at random, from that stream, among the waiting queues holding at least one job the freed server may serve.
 
 ## Example: Strict class priority for service admission
 
@@ -104,11 +100,11 @@ int class_priority_pick(const std::shared_ptr<des::event>& trigger,
                         int server_idx,
                         const std::vector<std::vector<int>>& q_map,
                         const std::vector<std::shared_ptr<des::queue>>& queues,
-                        std::shared_ptr<std::mt19937_64>& gen)
+                        des::random_engine& g)
 {
     (void)trigger;
     (void)server_idx;
-    (void)gen;
+    (void)g;
 
     // Priority order: class 2 > class 0 > class 1
     std::vector<int> prio{2, 0, 1};
@@ -154,8 +150,7 @@ auto ps_sta = std::make_shared<des::station<double, exponential_distribution>>(
     1,                                          // 1 server
     std::numeric_limits<unsigned int>::max(),   // unlimited → never full
     std::make_shared<des::ps>(),
-    "PS",
-    gen);
+    "PS");
 ```
 
 For **GPS** with two classes where class 0 receives twice the CPU share of class 1:
@@ -172,8 +167,7 @@ auto gps_sta = std::make_shared<des::station<double, exponential_distribution>>(
     1,
     std::numeric_limits<unsigned int>::max(),
     std::make_shared<des::ps>(std::vector<double>{2.0, 1.0}),  // weights per class
-    "GPS",
-    gen);
+    "GPS");
 ```
 
 ---
@@ -193,8 +187,7 @@ auto sta = std::make_shared<des::station<double, exponential_distribution>>(
     1,        // 1 job per server
     1,        // 1 waiting queue
     100,      // queue capacity
-    "M/M/2",
-    gen);
+    "M/M/2");
 ```
 
 ## Example: Infinite Server (IS) with Piecewise-Constant Distribution
@@ -210,6 +203,5 @@ auto is = std::make_shared<des::station<double, piecewise_constant_distribution>
         {dist}
     },
     1, INT_MAX,   // 1 server entry, unlimited capacity -> IS
-    "IS",
-    gen);
+    "IS");
 ```

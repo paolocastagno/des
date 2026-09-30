@@ -11,11 +11,19 @@ namespace des
 	sink::sink(string description) : sink(description, 1)
 	{}
 
-	sink::sink(vector<double> r, string description, mt19937_64&) : sink(description, static_cast<int>(r.size()))
+	sink::sink(vector<double> r, string description) : sink(description, static_cast<int>(r.size()))
 	{}
 
 	sink::~sink()
 	{}
+
+	bool sink::arrival(const shared_ptr<event>& e)
+	{
+		// The job leaves at once: no departure event, the event goes back to the pool
+		pass_through(e);
+		dispose_event(e);
+		return true;
+	}
 
 	int sink::schedule(const shared_ptr<event>&, const vector<vector<int>>&)
 	{

@@ -44,7 +44,7 @@ make golden
 
 then review `git diff test/regression/golden` before committing. The CI uploads the values generated on each runner as an artifact (`golden-<os>-<compiler>`), to commit the Linux ones.
 
-**Validation** (`[validation]`): simulated estimates against queueing theory: M/M/1, M/M/2 (Erlang-C), M/D/1 (Pollaczek-Khinchine), M/M/1-PS and M/D/1-PS (insensitivity), multi-class PS, weighted PS (work conservation), M/M/∞, M/M/2/2 (Erlang-B), a Jackson tandem and a closed network (mean value analysis). Each model runs 10 replications after a warm-up, and passes when the theoretical value lies in the replications' 99.9% Student-t confidence interval. Seeds are fixed, so the verdict is the same on every run of a platform; the 99.9% level keeps the chance of a false failure on a new platform small.
+**Validation** (`[validation]`): simulated estimates against queueing theory: M/M/1, M/M/2 (Erlang-C), M/D/1 (Pollaczek-Khinchine), M/M/1-PS and M/D/1-PS (insensitivity), multi-class PS, weighted PS (work conservation), M/M/∞, M/M/2/2 (Erlang-B), a Jackson tandem and a closed network (mean value analysis). One more M/M/1 check uses the regenerative method: a single run from an empty system, with no warm-up, where `des::ratio` estimates throughput and mean sojourn time from 20 000 regeneration cycles. Each of the other models runs 10 replications after a warm-up, and passes when the theoretical value lies in the replications' 99.9% Student-t confidence interval. Seeds are fixed, so the verdict is the same on every run of a platform; the 99.9% level keeps the chance of a false failure on a new platform small.
 
 **Sanitizers**: the unit and regression tiers under ASan + UBSan (memory errors, undefined behaviour), and the `[threads]` tests under TSan (data races between replications running on parallel threads).
 
@@ -71,8 +71,7 @@ using namespace des_models;
 
 TEST_CASE("a station serves in arrival order", "[unit][node]")
 {
-    auto gen = engine(1);
-    det_station sta(det_dists{{fixed(10)}}, 1, 1, 1, INT_MAX, "Q", gen);
+    det_station sta(det_dists{{fixed(10)}}, 1, 1, 1, INT_MAX, "Q");
     arrive(sta, 0, 0.0);
     auto second = arrive(sta, 0, 1.0);
     REQUIRE(second != nullptr);                     // stops the test case on failure
@@ -92,7 +91,7 @@ TEST_CASE("a station serves in arrival order", "[unit][node]")
 | `NOTE(stream)` | context shown if the test fails, or with `-v` |
 | `SKIP(stream)` | stops the test case and reports it as skipped |
 
-Use a fixed seed (`des_models::engine(seed)`) for every random generator, so that a failure can be reproduced. Validation checks should compare against a confidence interval at a high level (`0.001`) rather than a fixed tolerance.
+Use a fixed seed for every network (`des::network(nodes, routing, seed)`, or the `seed` of `des_models::open_model`), so that a failure can be reproduced. Validation checks should compare against a confidence interval at a high level (`0.001`) rather than a fixed tolerance.
 
 ## Continuous integration
 

@@ -1,4 +1,4 @@
-routed 17411
-blocked 7771
-lost 7771
-end_time 16924.009332087564
+routed 24561
+blocked 10880
+lost 10880
+end_time 23663.450648850649

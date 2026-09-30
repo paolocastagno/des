@@ -124,30 +124,30 @@ namespace
 
 TEST_CASE("golden: M/M/1", "[regression]")
 {
-	open_model m({0.8}, 101, [](auto g) { return one(mm_station(g, 1.0)); });
+	open_model m({0.8}, 101, [] { return one(mm_station(1.0)); });
 	m.run(10000, 50000, 3);
 	golden("mm1", open_values(m, 1));
 }
 
 TEST_CASE("golden: M/M/2", "[regression]")
 {
-	open_model m({1.6}, 102, [](auto g) { return one(mm_station(g, 1.0, 2)); });
+	open_model m({1.6}, 102, [] { return one(mm_station(1.0, 2)); });
 	m.run(10000, 50000, 3);
 	golden("mm2", open_values(m, 1));
 }
 
 TEST_CASE("golden: tandem of two stations", "[regression]")
 {
-	open_model m({0.8}, 103, [](auto g) { return std::vector<std::shared_ptr<des::node>>{mm_station(g, 1.0), mm_station(g, 1.25)}; });
+	open_model m({0.8}, 103, [] { return std::vector<std::shared_ptr<des::node>>{mm_station(1.0), mm_station(1.25)}; });
 	m.run(10000, 50000, 3);
 	golden("tandem", open_values(m, 1));
 }
 
 TEST_CASE("golden: two-class weighted PS", "[regression]")
 {
-	open_model m({0.3, 0.4}, 104, [](auto g)
+	open_model m({0.3, 0.4}, 104, []
 	{
-		return one(std::make_shared<exp_station>(exp_dists{{expo(1.0), expo(0.8)}}, 1, UNLIMITED, std::make_shared<des::ps>(std::vector<double>{2.0, 1.0}), "gps", g));
+		return one(std::make_shared<exp_station>(exp_dists{{expo(1.0), expo(0.8)}}, 1, UNLIMITED, std::make_shared<des::ps>(std::vector<double>{2.0, 1.0}), "gps"));
 	});
 	m.run(10000, 50000, 3);
 	golden("gps", open_values(m, 2));
@@ -155,14 +155,14 @@ TEST_CASE("golden: two-class weighted PS", "[regression]")
 
 TEST_CASE("golden: infinite server", "[regression]")
 {
-	open_model m({20.0}, 105, [](auto g) { return one(std::make_shared<exp_station>(exp_dists{{expo(1.0)}}, 1, UNLIMITED, std::make_shared<des::is>(), "is", g)); });
+	open_model m({20.0}, 105, [] { return one(std::make_shared<exp_station>(exp_dists{{expo(1.0)}}, 1, UNLIMITED, std::make_shared<des::is>(), "is")); });
 	m.run(10000, 50000, 3);
 	golden("is", open_values(m, 1));
 }
 
 TEST_CASE("golden: loss station", "[regression]")
 {
-	open_model m({1.5}, 106, [](auto g) { return one(mm_station(g, 1.0, 2, 0)); });
+	open_model m({1.5}, 106, [] { return one(mm_station(1.0, 2, 0)); });
 	m.step(60000);
 	values v{{"routed", static_cast<double>(m.net -> get_count(0, 1, 0))},
 			 {"blocked", static_cast<double>(m.net -> get_blocked(0, 1, 0))},
@@ -173,9 +173,8 @@ TEST_CASE("golden: loss station", "[regression]")
 
 TEST_CASE("golden: closed network", "[regression]")
 {
-	auto gen = engine(107);
-	auto a = mm_station(gen, 1.0), b = mm_station(gen, 2.0);
-	des::network net({a, b}, chain({1, 0}), gen);
+	auto a = mm_station(1.0), b = mm_station(2.0);
+	des::network net({a, b}, chain({1, 0}), 107);
 	for(int k = 0; k < 3; k++) a -> arrival(make_event(0, 0.0, 0));
 	double t = 0;
 	for(int r = 0; r < 3; r++)
@@ -190,7 +189,7 @@ TEST_CASE("the same seed reproduces a run exactly", "[regression]")
 {
 	auto run = [](unsigned long long seed)
 	{
-		open_model m({0.8}, seed, [](auto g) { return one(mm_station(g, 1.0)); });
+		open_model m({0.8}, seed, [] { return one(mm_station(1.0)); });
 		m.run(1000, 20000, 2);
 		return open_values(m, 1);
 	};

@@ -18,6 +18,7 @@
 #include "libdes_queue.hpp"
 #include "libdes_policy.hpp"
 #include "libdes_const.hpp"
+#include "libdes_random.hpp"
 
 using namespace std;
 
@@ -33,7 +34,7 @@ namespace des
 class des::node : public des::object, public des::observable
 {
 	public:
-		typedef int (*service_pick_handler)(const shared_ptr<event>&, int, const vector<vector<int>>&, const vector<shared_ptr<queue>>&, shared_ptr<mt19937_64>&);
+		typedef int (*service_pick_handler)(const shared_ptr<event>&, int, const vector<vector<int>>&, const vector<shared_ptr<queue>>&, random_engine&);
 		// Constructor & destructor
 		/**
 		 * @brief Construct a new node::node object. Each node object is characterized by one or more policy specifying how to handle events
@@ -51,39 +52,23 @@ class des::node : public des::object, public des::observable
 		 * @brief Construct a new node::node object. Each node object is characterized by one or more policy specifying how to handle events
 		 * 
 		 * @param descriptioin Description of the node
-		 * @param g The global mersenne twister random number generator used to generate Events' service time
-		 */
-		node(string description, shared_ptr<mt19937_64> g);
-		/**
-		 * @brief Construct a new node::node object. Each node object is characterized by one or more policy specifying how to handle events
-		 * 
-		 * @param descriptioin Description of the node
-		 * @param g The global mersenne twister random number generator used to generate Events' service time
+		 * @param cls number of classes handled
 		 */
 		node(string description, int cls);
 		/**
 		 * @brief Construct a new node::node object. Each node object is characterized by one or more policy specifying how to handle events
 		 * 
+		 * @param cls number of classes handled  
 		 * @param descriptioin Description of the node
-		 * @param g The global mersenne twister random number generator used to generate Events' service time
 		 */
-		node(string description, int cls, shared_ptr<mt19937_64> g);
+		node(unsigned int cls, vector<shared_ptr<queue>> q_vec, vector<shared_ptr<queue>> s_vec, vector<vector<int>> qmap, vector<vector<int>> smap, string description);
 		/**
 		 * @brief Construct a new node::node object. Each node object is characterized by one or more policy specifying how to handle events
 		 * 
 		 * @param cls number of classes handled  
 		 * @param descriptioin Description of the node
-		 * @param g The global mersenne twister random number generator used to generate events' service time
 		 */
-		node(unsigned int cls, vector<shared_ptr<queue>> q_vec, vector<shared_ptr<queue>> s_vec, vector<vector<int>> qmap, vector<vector<int>> smap, string description, shared_ptr<mt19937_64> g);
-		/**
-		 * @brief Construct a new node::node object. Each node object is characterized by one or more policy specifying how to handle events
-		 * 
-		 * @param cls number of classes handled  
-		 * @param descriptioin Description of the node
-		 * @param g The global mersenne twister random number generator used to generate events' service time
-		 */
-		node(unsigned int cls, string description, shared_ptr<mt19937_64> g);
+		node(unsigned int cls, string description);
 		/**
 		 * @brief Set the custom handler used to pick the next waiting queue when moving jobs to service.
 		 * 
@@ -92,6 +77,20 @@ class des::node : public des::object, public des::observable
 		inline void set_service_pick_handler(service_pick_handler handler)
 		{
 			handle_service_pick = handler;
+		}
+		/**
+		 * @brief Give the node its own block of random streams.
+		 *
+		 * Stream 0 draws the node's choices among queues and servers, stream 1 + c the service
+		 * times of class c. The network gives each of its nodes a distinct block when it is
+		 * constructed (see network::network); call this afterwards to choose another block.
+		 * Until then, every node draws from the block of a default-seeded engine.
+		 *
+		 * @param block engine positioned at the start of the block
+		 */
+		inline void set_streams(const random_engine& block)
+		{
+			streams = stream_block(block);
 		}
 		/**
 		 * @brief Destroy the node object
@@ -118,6 +117,7 @@ class des::node : public des::object, public des::observable
 		inline void set_server(vector<shared_ptr<queue>>& s_vec)
 		{
 			s = s_vec;
+			refresh_next();
 		}
 		/**
 		 * @brief Set queue-to-class mapping matrix.
@@ -181,11 +181,13 @@ class des::node : public des::object, public des::observable
 		/**
 		 * @brief Handle a new arrival of the event *e* at time *time*.
 		 * 
+		 * Subclasses may override it to handle arrivals differently (e.g. des::sink absorbs them).
+		 *
 		 * @param time time
 		 * @param e *const* pointer to the arriving
 		 * @return true if the event is allowed to get in the node, false otherwise
 		 */
-		bool arrival(const shared_ptr<event>& e);
+		virtual bool arrival(const shared_ptr<event>& e);
 		/**
 		 * @brief Handle a departure of the event *e* at time *time*.
 		 * 
@@ -194,9 +196,9 @@ class des::node : public des::object, public des::observable
 		 */
 		shared_ptr<event> departure();
 		/**
-		 * @brief Get the time of the first event in the EventList
-		 * 
-		 * @return double 
+		 * @brief Get the time of the next departure, __DBL_MAX__ if no job is in service
+		 *
+		 * @return double
 		 */
 		virtual double next_event_time() const;
 		// Utility methods
@@ -236,6 +238,15 @@ class des::node : public des::object, public des::observable
 		}
 	protected:
 		/**
+		 * @brief Record the arrival of @p e and its departure at the same time, as a server with
+		 *        zero service time would, without holding the job.
+		 *
+		 * Updates the counters, sets and clears the tags as arrival() and departure() do (with
+		 * zero sojourn, wait and service), and notifies the arrival, service and departure signals.
+		 * No departure event is scheduled.
+		 */
+		void pass_through(const shared_ptr<event>& e);
+		/**
 		 * @brief Maps classes to queues. q_map[i,j] tells wheter the i-th class is allowed to use the j-th queue
 		 * 
 		 */
@@ -256,10 +267,19 @@ class des::node : public des::object, public des::observable
 		 */
 		vector<shared_ptr<queue>> s;
 		/**
-		 * @brief Pointer to the global std::random_device
-		 *
+		 * @brief Random stream of the node's choices among queues and servers
 		 */
-		shared_ptr<mt19937_64> gen;
+		inline random_engine& choice_stream()
+		{
+			return streams.at(0);
+		}
+		/**
+		 * @brief Random stream of the service times of class @p cls
+		 */
+		inline random_engine& service_stream(unsigned int cls)
+		{
+			return streams.at(1 + static_cast<size_t>(cls));
+		}
 		/**
 		 * @brief Get the average service time for class cls
 		 * 
@@ -287,7 +307,7 @@ class des::node : public des::object, public des::observable
 		/**
 		 * @brief Default service selection handler. Returns the queue index selected by dequeue().
 		 */
-		virtual int shfunc(const shared_ptr<event>& e, int sched, const vector<vector<int>>& qmap, const vector<shared_ptr<queue>>& queues, shared_ptr<mt19937_64>& g);
+		virtual int shfunc(const shared_ptr<event>& e, int sched, const vector<vector<int>>& qmap, const vector<shared_ptr<queue>>& queues, random_engine& g);
 		/**
 		 * @brief Tells whether server @p srv may serve jobs of class @p cls according to s_map.
 		 * Classes or servers missing from s_map are not restricted.
@@ -303,6 +323,10 @@ class des::node : public des::object, public des::observable
 	private:
 		// ids generator
 		inline static atomic<unsigned int> id_gen{0};
+		/**
+		 * @brief The node's random streams, see set_streams()
+		 */
+		stream_block streams;
 		// Measures
         vector<long> in;
         vector<long> out;
@@ -352,5 +376,17 @@ class des::node : public des::object, public des::observable
 		 * @return an integer used to index the right queue in the s_map structure.
 		 */
 		int idx_next_departure() const;
+		/**
+		 * @brief Time and server of the next departure, kept up to date by refresh_next()
+		 */
+		double next_time = __DBL_MAX__;
+		int next_server = 0;
+		/**
+		 * @brief Recompute next_time and next_server from the servers.
+		 *
+		 * The servers change only through arrival(), departure(), reset(), clear() and
+		 * set_server(), which call it after the change.
+		 */
+		void refresh_next();
 };
 #endif

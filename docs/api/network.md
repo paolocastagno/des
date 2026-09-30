@@ -13,7 +13,7 @@
 // Basic constructor
 network(std::vector<std::shared_ptr<node>> nodes,
         std::vector<std::vector<std::vector<double>>> routing,
-        std::shared_ptr<std::mt19937_64>& gen);
+        uint64_t seed);
 
 // With custom routing/fork handler
 network(std::vector<std::shared_ptr<node>> nodes,
@@ -21,8 +21,8 @@ network(std::vector<std::shared_ptr<node>> nodes,
         int (*fork_handler)(
             const std::shared_ptr<event>&,
             const std::vector<std::vector<std::vector<double>>>& routing,
-            std::shared_ptr<std::mt19937_64>& gen),
-        std::shared_ptr<std::mt19937_64>& gen);
+            des::random_engine& g),
+        uint64_t seed);
 
 // With custom block handler
 network(std::vector<std::shared_ptr<node>> nodes,
@@ -31,8 +31,8 @@ network(std::vector<std::shared_ptr<node>> nodes,
             const std::shared_ptr<event>&,
             int destination,
             const std::vector<std::vector<std::vector<double>>>& routing,
-            std::shared_ptr<std::mt19937_64>& gen),
-        std::shared_ptr<std::mt19937_64>& gen);
+            des::random_engine& g),
+        uint64_t seed);
 
 // With custom routing/fork and block handlers
 network(std::vector<std::shared_ptr<node>> nodes,
@@ -40,14 +40,20 @@ network(std::vector<std::shared_ptr<node>> nodes,
         int (*fork_handler)(
             const std::shared_ptr<event>&,
             const std::vector<std::vector<std::vector<double>>>& routing,
-            std::shared_ptr<std::mt19937_64>& gen),
+            des::random_engine& g),
         std::pair<bool,int> (*block_handler)(
             const std::shared_ptr<event>&,
             int destination,
             const std::vector<std::vector<std::vector<double>>>& routing,
-            std::shared_ptr<std::mt19937_64>& gen),
-        std::shared_ptr<std::mt19937_64>& gen);
+            des::random_engine& g),
+        uint64_t seed);
 ```
+
+### Random Streams
+
+The constructor seeds one xoshiro256** generator with `seed` and splits it into disjoint streams by jump-ahead. Node `i` receives block `2i` of the period (see [`node::set_streams`](node.md#random-streams)), and the routing of the class-`c` events leaving node `i` uses stream `c` of block `2i+1`. The routing and block handlers receive that stream as `g`.
+
+A stream depends only on the node index: nodes added after the others, and changes to one node or class, leave the other streams unchanged, so model variants compared with the same seed share common random numbers. Build the network before delivering the first events, which would otherwise draw from the nodes' default streams.
 
 ### Routing Matrix
 
@@ -63,7 +69,7 @@ Nodes are indexed in the order they appear in the `nodes` vector.
 std::pair<bool, int> handler(const std::shared_ptr<des::event>& e,
                              int destination,
                              const std::vector<std::vector<std::vector<double>>>& routing,
-                             std::shared_ptr<std::mt19937_64>& gen);
+                             des::random_engine& g);
 ```
 
 Return `{true, alternative_destination}` to reroute, or `{false, _}` to drop the event. If the alternative destination is full too, the handler is called again with that destination, up to `set_max_reroute_attempts()` times (default: the number of nodes). An event no destination accepts is lost. Without a block handler, blocked events are lost. Each refusal is counted on the refused edge (`get_blocked`), and each loss on the node the event departed from (`get_lost`); the event also carries `EVENT_REJECT = 1`.
@@ -73,7 +79,7 @@ Return `{true, alternative_destination}` to reroute, or `{false, _}` to drop the
 ```cpp
 int handler(const std::shared_ptr<des::event>& e,
             const std::vector<std::vector<std::vector<double>>>& routing,
-            std::shared_ptr<std::mt19937_64>& gen);
+            des::random_engine& g);
 ```
 
 Return the destination node index (any node, including node `0`). Returning a negative value (e.g. `-1`) or an index outside the routing row makes the event leave the network.
@@ -156,7 +162,7 @@ std::vector<std::vector<std::vector<double>>> routing = {
     {{0}, {0}, {0}}    // node 2 (sink)    -> nowhere
 };
 
-des::network net({src, sta, snk}, routing, gen);
+des::network net({src, sta, snk}, routing, 42);
 
 for (int i = 0; i < 100000; ++i)
 {

@@ -41,34 +41,47 @@ namespace des
 			/**
 			 * @brief Construct a network using the default routing and blocking handlers.
 			 *
+			 * Every source of randomness draws from its own stream of one xoshiro256** generator
+			 * seeded with @p seed. The period is split by jump-ahead into blocks of 2^192 draws:
+			 * node i receives block 2i (see node::set_streams()), and the routing of the events
+			 * leaving node i uses block 2i+1, one stream of 2^128 draws per class. A stream thus
+			 * depends on the node index only: adding nodes after the others, or changing the
+			 * parameters of a node, leaves the streams of the other nodes unchanged, which keeps
+			 * common random numbers synchronized across model variants. Different seeds start the
+			 * generator at random points of its period: streams of different seeds overlap with
+			 * negligible probability.
+			 *
+			 * Events delivered to a node before the network is constructed draw from the node's
+			 * default streams.
+			 *
 			 * @param nds Nodes indexed by position; routing destinations refer to these indices.
 			 * @param rtg Routing probabilities as rtg[source][destination][class].
-			 * @param g Shared pseudo-random generator used by routing decisions.
+			 * @param seed Seed of the random streams of the nodes and of the routing.
 			 */
-			network(vector<shared_ptr<node>> nds, vector<vector<vector<double>>> rtg, shared_ptr<mt19937_64>& g);
+			network(vector<shared_ptr<node>> nds, vector<vector<vector<double>>> rtg, uint64_t seed);
 			/**
 			 * @brief Construct a network with a custom routing/fork handler.
 			 *
 			 * @param nds Nodes indexed by position; routing destinations refer to these indices.
 			 * @param rtg Routing probabilities as rtg[source][destination][class].
 			 * @param hffunc Function used to choose the next destination for a departed event.
-			 * @param g Shared pseudo-random generator used by routing decisions.
+			 * @param seed Seed of the random streams of the nodes and of the routing (see the first constructor).
 			 */
 			network(vector<shared_ptr<node>> nds, vector<vector<vector<double>>> rtg,
-					int (*hffunc)(const shared_ptr<event>&, const vector<vector<vector<double>>>&, shared_ptr<mt19937_64>&),
-					shared_ptr<mt19937_64>& g);
+					int (*hffunc)(const shared_ptr<event>&, const vector<vector<vector<double>>>&, random_engine&),
+					uint64_t seed);
 			/**
 			 * @brief Construct a network with a custom blocking handler.
 			 *
 			 * @param nds Nodes indexed by position; routing destinations refer to these indices.
 			 * @param rtg Routing probabilities as rtg[source][destination][class].
 			 * @param hbfunc Function used when a destination node rejects an event.
-			 * @param g Shared pseudo-random generator used by routing decisions.
+			 * @param seed Seed of the random streams of the nodes and of the routing (see the first constructor).
 			 */
 			network(vector<shared_ptr<node>> nds, vector<vector<vector<double>>> rtg,
 					pair<bool, int> (*hbfunc)(const shared_ptr<event>&, int,
-											const vector<vector<vector<double>>>&, shared_ptr<mt19937_64>&),
-					shared_ptr<mt19937_64>& g);
+											const vector<vector<vector<double>>>&, random_engine&),
+					uint64_t seed);
 			/**
 			 * @brief Construct a network with custom routing and blocking handlers.
 			 *
@@ -76,17 +89,17 @@ namespace des
 			 * @param rtg Routing probabilities as rtg[source][destination][class].
 			 * @param hffunc Function used to choose the next destination for a departed event.
 			 * @param hbfunc Function used when a destination node rejects an event.
-			 * @param g Shared pseudo-random generator used by routing decisions.
+			 * @param seed Seed of the random streams of the nodes and of the routing (see the first constructor).
 			 */
 			network(vector<shared_ptr<node>> nds, vector<vector<vector<double>>> rtg,
-					int (*hffunc)(const shared_ptr<event>&, const vector<vector<vector<double>>>&, shared_ptr<mt19937_64>&),
+					int (*hffunc)(const shared_ptr<event>&, const vector<vector<vector<double>>>&, random_engine&),
 					pair<bool, int> (*hbfunc)(const shared_ptr<event>&, int,
-											const vector<vector<vector<double>>>&, shared_ptr<mt19937_64>&),
-					shared_ptr<mt19937_64>& g);
+											const vector<vector<vector<double>>>&, random_engine&),
+					uint64_t seed);
 			// Constraint-handler constructors are kept here as design notes for a
 			// future extension, but the Constraint type is not part of this build.
-			// network(vector<shared_ptr<node>> nds, vector<vector<vector<double>>> rtg, vector<vector<vector<pair<shared_ptr<Constraint>, function<bool(event*, const vector<shared_ptr<node>>&)>>>>>  const_handler, shared_ptr<mt19937_64>& g);
-			// network(vector<shared_ptr<node>> nds, vector<vector<vector<double>>> rtg, vector<vector<vector<double>>> rtg_fail, vector<vector<vector<pair<shared_ptr<Constraint>, function<bool(event*, const vector<shared_ptr<node>>&)>>>>>  const_handler, shared_ptr<mt19937_64>& g);
+			// network(vector<shared_ptr<node>> nds, vector<vector<vector<double>>> rtg, vector<vector<vector<pair<shared_ptr<Constraint>, function<bool(event*, const vector<shared_ptr<node>>&)>>>>>  const_handler, uint64_t seed);
+			// network(vector<shared_ptr<node>> nds, vector<vector<vector<double>>> rtg, vector<vector<vector<double>>> rtg_fail, vector<vector<vector<pair<shared_ptr<Constraint>, function<bool(event*, const vector<shared_ptr<node>>&)>>>>>  const_handler, uint64_t seed);
 			/**
 			 * @brief Route a departed event to its next node.
 			 *
@@ -326,10 +339,13 @@ namespace des
 			/**
 			 * @brief Default blocking handler.
 			 *
+			 * The routing and blocking handlers receive the routing stream of the event's
+			 * current node and class.
+			 *
 			 * @return Pair whose first value tells whether rerouting should be attempted
 			 *         and whose second value is the reroute destination.
 			 */
-			virtual pair<bool, int> hbfunc(const shared_ptr<event>&, int, const vector<vector<vector<double>>>&, shared_ptr<mt19937_64>& g);
+			virtual pair<bool, int> hbfunc(const shared_ptr<event>&, int, const vector<vector<vector<double>>>&, random_engine& g);
 			/**
 			 * @brief Default routing handler.
 			 *
@@ -337,22 +353,36 @@ namespace des
 			 *
 			 * @return Destination node index, or -1 when the event leaves the network.
 			 */
-			virtual int hffunc(const shared_ptr<event>&, const vector<vector<vector<double>>> &, shared_ptr<mt19937_64>& g);
+			virtual int hffunc(const shared_ptr<event>&, const vector<vector<vector<double>>> &, random_engine& g);
+			/**
+			 * @brief Rebuild the routing table sampled by the default routing handler from @c routing.
+			 *
+			 * The constructors call it; a subclass that changes @c routing afterwards must call it again.
+			 */
+			void build_route_table();
 		private:
 			/**
-			 * @brief Shared simulator-wide pseudo-random generator.
+			 * @brief Routing streams: route_streams[i].at(c) routes the events of class c leaving node i.
 			 */
-	        shared_ptr<mt19937_64> gen;
+	        vector<stream_block> route_streams;
+			/**
+			 * @brief route_table[i][c]: the destinations j with routing[i][j][c] > 0, in increasing j,
+			 *        each with the cumulative probability of the row up to j.
+			 *
+			 * Lets the default routing handler skip the zero entries. It is empty for a class that
+			 * some edge of row i does not list: the handler then scans the row.
+			 */
+			vector<vector<vector<pair<int, double>>>> route_table;
 			// Placeholder for rejected or constrained movement counts.
 	        // vector<vector<vector<int>>> count_constrained_events;
 			/**
 			 * @brief Optional function used when a destination node rejects an event.
 			 */
-			pair<bool, int> (*handle_block)(const shared_ptr<event>&, int, const vector<vector<vector<double>>>&, shared_ptr<mt19937_64>& g) = nullptr;
+			pair<bool, int> (*handle_block)(const shared_ptr<event>&, int, const vector<vector<vector<double>>>&, random_engine& g) = nullptr;
 			/**
 			 * @brief Optional function used to choose the next destination for an event.
 			 */
-			int (*handle_forks)(const shared_ptr<event>&, const vector<vector<vector<double>>>&, shared_ptr<mt19937_64>&) = nullptr;
+			int (*handle_forks)(const shared_ptr<event>&, const vector<vector<vector<double>>>&, random_engine&) = nullptr;
 			/**
 			 * @brief Current simulation time: time of the last event returned by next_event().
 			 */

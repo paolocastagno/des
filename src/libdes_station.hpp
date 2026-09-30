@@ -32,9 +32,8 @@ template <typename TT, template <typename> typename T> class des::station : publ
 		 * @brief Construct a new des::station object. Every station object handles events according to a FIFO queue and a SingleServer server
 		 * 
 		 * @param r Vector specifying per class service rates 
-		 * @param gen The global std::mt19937 used to generate pseudo-random numbers
 		 */
-		station(vector<vector<shared_ptr<T<TT>>>> rand_dist, unsigned int nserver, unsigned int s_places, shared_ptr<policy> p_server, string description, shared_ptr<mt19937_64> gen);
+		station(vector<vector<shared_ptr<T<TT>>>> rand_dist, unsigned int nserver, unsigned int s_places, shared_ptr<policy> p_server, string description);
 		/**
 		 * @brief Construct a new des::station object with a custom service-pick handler.
 		 * 
@@ -44,41 +43,36 @@ template <typename TT, template <typename> typename T> class des::station : publ
 		 * @param p_server Service queue policy
 		 * @param shfunc Custom handler selecting from which waiting queue to dequeue next job
 		 * @param description Station description
-		 * @param gen Shared random generator
 		 */
-		station(vector<vector<shared_ptr<T<TT>>>> rand_dist, unsigned int nserver, unsigned int s_places, shared_ptr<policy> p_server, node::service_pick_handler shfunc, string description, shared_ptr<mt19937_64> gen);
+		station(vector<vector<shared_ptr<T<TT>>>> rand_dist, unsigned int nserver, unsigned int s_places, shared_ptr<policy> p_server, node::service_pick_handler shfunc, string description);
 		/**
 		 * @brief Construct a new des::station object. Every station object handles events according to a FIFO queue and a SingleServer server
 		 * 
 		 * @param r Vector specifying per class service rates 
-		 * @param gen The global std::mt19937 used to generate pseudo-random numbers
 		 */
-		station(vector<vector<shared_ptr<T<TT>>>> rand_dist, unsigned int nserver, unsigned int s_places, string description, shared_ptr<mt19937_64> gen);
+		station(vector<vector<shared_ptr<T<TT>>>> rand_dist, unsigned int nserver, unsigned int s_places, string description);
 		/**
 		 * @brief Construct a new des::station object. Every station object handles events according to a FIFO queue and a SingleServer server
 		 * 
 		 * @param r Vector specifying per class service rates 
-		 * @param gen The global std::mt19937 used to generate pseudo-random numbers
 		 */
-		station(vector<vector<shared_ptr<T<TT>>>> rand_dist, unsigned int nserver, unsigned int s_places, unsigned int nqueue, unsigned int q_places, shared_ptr<policy> p_queue, shared_ptr<policy> p_server, string description, shared_ptr<mt19937_64> gen);
+		station(vector<vector<shared_ptr<T<TT>>>> rand_dist, unsigned int nserver, unsigned int s_places, unsigned int nqueue, unsigned int q_places, shared_ptr<policy> p_queue, shared_ptr<policy> p_server, string description);
 		/**
 		 * @brief Construct a new des::station object with explicit queue/server policies and custom service-pick handler.
 		 */
-		station(vector<vector<shared_ptr<T<TT>>>> rand_dist, unsigned int nserver, unsigned int s_places, unsigned int nqueue, unsigned int q_places, shared_ptr<policy> p_queue, shared_ptr<policy> p_server, node::service_pick_handler shfunc, string description, shared_ptr<mt19937_64> gen);
+		station(vector<vector<shared_ptr<T<TT>>>> rand_dist, unsigned int nserver, unsigned int s_places, unsigned int nqueue, unsigned int q_places, shared_ptr<policy> p_queue, shared_ptr<policy> p_server, node::service_pick_handler shfunc, string description);
 		/**
 		 * @brief Construct a new des::station object. Every station object handles events according to a FIFO queue and a SingleServer server
 		 * 
 		 * @param r Vector specifying per class service rates 
-		 * @param gen The global std::mt19937 used to generate pseudo-random numbers
 		 */
-		station(vector<vector<shared_ptr<T<TT>>>> rand_dist, unsigned int nserver, unsigned int s_places, unsigned int nqueue, unsigned int q_places, string description, shared_ptr<mt19937_64> gen);
+		station(vector<vector<shared_ptr<T<TT>>>> rand_dist, unsigned int nserver, unsigned int s_places, unsigned int nqueue, unsigned int q_places, string description);
 		/**
 		 * @brief Construct a new des::station object. Every station object handles events according to a FIFO queue and a SingleServer server
 		 * 
 		 * @param r Vector specifying per class service rates 
-		 * @param gen The global std::mt19937 used to generate pseudo-random numbers
 		 */
-		station(vector<vector<shared_ptr<T<TT>>>> rand_dist, string description, shared_ptr<mt19937_64> gen);
+		station(vector<vector<shared_ptr<T<TT>>>> rand_dist, string description);
 		/**
 		 * @brief Sets the random variable parameters
 		 * 
@@ -132,7 +126,7 @@ template <typename TT, template <typename> typename T> class des::station : publ
 		 *
 		 * @return int the queue index, or -1 if no waiting job can use the server
 		 */
-		int shfunc(const shared_ptr<event>& e, int sched, const vector<vector<int>>& qmap, const vector<shared_ptr<queue>>& queues, shared_ptr<mt19937_64>& g) override;
+		int shfunc(const shared_ptr<event>& e, int sched, const vector<vector<int>>& qmap, const vector<shared_ptr<queue>>& queues, random_engine& g) override;
 	private:
 		/**
 		 * @brief Data structure of size m * n, where m are the number of server in the queue and n is the number of jobs' classes

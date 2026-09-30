@@ -14,7 +14,7 @@ namespace
 {
 	double mm1_mean_sojourn(unsigned long long seed)
 	{
-		open_model m({0.8}, seed, [](std::shared_ptr<std::mt19937_64> g) { return std::vector<std::shared_ptr<des::node>>{mm_station(g, 1.0)}; });
+		open_model m({0.8}, seed, [] { return std::vector<std::shared_ptr<des::node>>{mm_station(1.0)}; });
 		m.run(0, 100000, 2);
 		return m.sojourn[0] -> get_scalar(0);
 	}
@@ -22,18 +22,17 @@ namespace
 
 TEST_CASE("events returned by next_event are not recycled while held", "[unit][pool]")
 {
-	auto gen = engine(21);
-	auto src = std::make_shared<des::source>(std::vector<double>{1.0}, "src", gen);
+	auto src = poisson_source({1.0}, "src");
 	auto snk = std::make_shared<des::sink>("snk");
-	des::network net({src, snk}, chain({1, -1}), gen);
+	des::network net({src, snk}, chain({1, -1}), 21);
 	src -> arrival(make_event(0, 0.0));
 	std::vector<std::pair<std::shared_ptr<des::event>, double>> kept;
-	for(int i = 0, sunk = 0; i < 2000; i++)
+	for(int i = 0; i < 2000; i++)
 	{
 		auto e = net.next_event();
-		if(e -> get_info(EVENT_NODE).second == 1 && sunk++ % 50 == 0)
+		net.route(e);                         // the sink absorbs e and returns it to the pool
+		if(i % 50 == 0)
 			kept.push_back({e, e -> get_time()});
-		net.route(e);
 	}
 	REQUIRE(!kept.empty());
 	for(auto& [e, t] : kept)

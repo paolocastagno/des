@@ -1,5 +1,6 @@
 #include <memory>
 #include <stdexcept>
+#include <utility>
 #include <vector>
 
 #include <libdes_const.hpp>
@@ -53,14 +54,13 @@ namespace
 TEST_CASE("node constructor sizes its counters for every class", "[unit][node]")
 {
 	auto srv = std::make_shared<des::queue>(1u, std::make_shared<des::fifo>());
-	probe_node n(3u, {}, {srv}, {}, {{1, 1, 1}}, "probe", engine(1));
+	probe_node n(3u, {}, {srv}, {}, {{1, 1, 1}}, "probe");
 	CHECK(des_models::arrive(n, 2, 0.0) != nullptr);   // class 2: out of range before the fix
 }
 
 TEST_CASE("departure records sojourn, wait and service", "[unit][node]")
 {
-	auto gen = engine(2);
-	det_station sta(det_dists{{fixed(10)}}, 1, 1, 1, INT_MAX, "Q", gen);
+	det_station sta(det_dists{{fixed(10)}}, 1, 1, 1, INT_MAX, "Q");
 	arrive(sta, 0, 0.0);
 	arrive(sta, 0, 1.0);
 	auto first = sta.departure();
@@ -78,9 +78,8 @@ TEST_CASE("departure records sojourn, wait and service", "[unit][node]")
 
 TEST_CASE("a class without a mapped queue is refused; without a mapped server it is an error", "[unit][node]")
 {
-	auto gen = engine(3);
 	auto x = expo(1.0);
-	exp_station sta(exp_dists{{x, x}}, 1, 1, 1, INT_MAX, "Q", gen);
+	exp_station sta(exp_dists{{x, x}}, 1, 1, 1, INT_MAX, "Q");
 	sta.set_queue_map({{1, 0}});             // queue 0 only for class 0
 	REQUIRE(arrive(sta, 0, 0.0) != nullptr);   // fills the server
 	CHECK(arrive(sta, 1, 0.0) == nullptr);     // was accepted into class 0's queue before the fix
@@ -90,8 +89,7 @@ TEST_CASE("a class without a mapped queue is refused; without a mapped server it
 
 TEST_CASE("a freed server takes a waiting job of another class", "[unit][node]")
 {
-	auto gen = engine(4);
-	det_station sta(det_dists{{fixed(1), fixed(1)}}, 1, 1, 2, INT_MAX, "Q", gen);
+	det_station sta(det_dists{{fixed(1), fixed(1)}}, 1, 1, 2, INT_MAX, "Q");
 	sta.set_queue_map({{1, 0}, {0, 1}});     // queue 0: class 0, queue 1: class 1
 	arrive(sta, 0, 0.0);
 	auto waiting = arrive(sta, 1, 0.0);
@@ -103,9 +101,8 @@ TEST_CASE("a freed server takes a waiting job of another class", "[unit][node]")
 
 TEST_CASE("a freed server skips waiting jobs it may not serve", "[unit][node]")
 {
-	auto gen = engine(5);
 	// server 0 slow (10) and only for class 0, server 1 fast (1) and only for class 1
-	det_station sta(det_dists{{fixed(10), fixed(10)}, {fixed(1), fixed(1)}}, 2, 1, 1, INT_MAX, "Q", gen);
+	det_station sta(det_dists{{fixed(10), fixed(10)}, {fixed(1), fixed(1)}}, 2, 1, 1, INT_MAX, "Q");
 	sta.set_server_map({{1, 0}, {0, 1}});
 	arrive(sta, 0, 0.0);
 	arrive(sta, 1, 0.0);
@@ -119,7 +116,7 @@ TEST_CASE("a freed server skips waiting jobs it may not serve", "[unit][node]")
 
 TEST_CASE("reset shifts the service start of jobs in service", "[unit][node]")
 {
-	open_model m({0.9}, 6, [](std::shared_ptr<std::mt19937_64> g) { return std::vector<std::shared_ptr<des::node>>{mm_station(g, 1.0)}; });
+	open_model m({0.9}, 6, [] { return std::vector<std::shared_ptr<des::node>>{mm_station(1.0)}; });
 	auto service = std::make_shared<min_observer>(NODE_SERVICE);
 	auto wait = std::make_shared<min_observer>(NODE_WAIT);
 	m.stations[0] -> attach(SIGNAL_NODE_DEPARTURE, service);
@@ -130,10 +127,31 @@ TEST_CASE("reset shifts the service start of jobs in service", "[unit][node]")
 	NOTE("min service " << service -> min << ", min wait " << wait -> min);
 }
 
+TEST_CASE("a source draws each class's inter-arrival times from its distribution", "[unit][node][source]")
+{
+	det_source src({fixed(2), fixed(5)}, "src");
+	arrive(src, 0, 0.0);
+	arrive(src, 1, 0.0);
+	auto next = [&src](int n)
+	{
+		std::vector<std::pair<int, double>> got;
+		for(int i = 0; i < n; i++)
+		{
+			auto e = src.departure();
+			got.push_back({e -> get_cls(), e -> get_time()});
+		}
+		return got;
+	};
+	CHECK(next(4) == std::vector<std::pair<int, double>>{{0, 2.0}, {0, 4.0}, {1, 5.0}, {0, 6.0}});
+	src.set_rng(fixed(1), 0);
+	// The arrival at 8 was drawn before the change
+	CHECK(next(2) == std::vector<std::pair<int, double>>{{0, 8.0}, {0, 9.0}});
+	CHECK_EQ(src.get_rng(1) -> a(), 5.0);
+}
+
 TEST_CASE("a copied node keeps notifying after the original is destroyed", "[unit][node]")
 {
-	auto gen = engine(7);
-	auto original = std::make_unique<exp_station>(exp_dists{{expo(1.0)}}, 1, 1, 1, INT_MAX, "Q", gen);
+	auto original = std::make_unique<exp_station>(exp_dists{{expo(1.0)}}, 1, 1, 1, INT_MAX, "Q");
 	auto departures = std::make_shared<des::counter>("departures", 1);
 	original -> attach(SIGNAL_NODE_DEPARTURE, departures);
 	arrive(*original, 0, 0.0);

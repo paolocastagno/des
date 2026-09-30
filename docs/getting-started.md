@@ -76,12 +76,11 @@ The snippet below creates a single-queue M/M/1 simulation with a source, one FIF
 
 int main()
 {
-    // Shared random-number generator (seeded for reproducibility)
-    auto gen = std::make_shared<std::mt19937_64>();
-    gen->seed(42);
-
-    // Arrival rate lambda = 0.8 events/time unit
-    auto src  = std::make_shared<des::source>(std::vector<double>{0.8}, "Source", gen);
+    // Arrival rate lambda = 0.8 events/time unit — exponential inter-arrival time
+    auto arr  = std::make_shared<std::exponential_distribution<double>>(0.8);
+    auto src  = std::make_shared<des::source<double, std::exponential_distribution>>(
+                    std::vector<std::shared_ptr<std::exponential_distribution<double>>>{arr},
+                    "Source");
 
     // Service rate mu = 1.0 — exponential service time
     auto svc  = std::make_shared<std::exponential_distribution<double>>(1.0);
@@ -91,8 +90,7 @@ int main()
                     1,      // server capacity
                     1,      // number of waiting queues
                     100,    // queue capacity
-                    "M/M/1",
-                    gen);
+                    "M/M/1");
 
     auto snk  = std::make_shared<des::sink>("Sink");
 
@@ -103,7 +101,8 @@ int main()
         {{0}, {0}, {0}}
     };
 
-    des::network net({src, sta, snk}, routing, gen);
+    // The seed (42) makes the run reproducible: every node gets its own random streams
+    des::network net({src, sta, snk}, routing, 42);
 
     // Inject the first event
     auto e = std::make_shared<des::event>();

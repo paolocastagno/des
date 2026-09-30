@@ -20,7 +20,7 @@ using namespace std;
 
 namespace des
 {
-	class source;
+	template <typename TT, template <typename> typename T> class source;
 }
 
 /**
@@ -28,27 +28,33 @@ namespace des
  *
  * A source has no waiting queues. Incoming bootstrap events enter service and
  * depart after an inter-arrival time sampled from the class-specific
- * exponential distribution. On departure, source::dequeue() clones the
- * departed event into a recycled event object and immediately schedules the
- * next arrival at the source, keeping the external arrival stream alive.
+ * distribution. On departure, source::dequeue() clones the departed event into
+ * a recycled event object and immediately schedules the next arrival at the
+ * source, keeping the external arrival stream alive.
+ *
+ * Like des::station, the source is templated on the distribution: T<TT> is a
+ * <random> distribution, e.g. source<double, exponential_distribution> for a
+ * Poisson arrival stream.
  */
-class des::source : public des::sourcesink
+template <typename TT, template <typename> typename T> class des::source : public des::sourcesink
 {
 	public:
 		/**
-		 * @brief Construct a source with class-specific exponential arrival rates.
+		 * @brief Construct a source with class-specific inter-arrival distributions.
 		 *
-		 * @param r Arrival rates, indexed by event class.
+		 * Each class samples its inter-arrival times from its own random stream
+		 * (see node::set_streams()).
+		 *
+		 * @param rand_dist Inter-arrival time distributions, indexed by event class.
 		 * @param description String identifier.
-		 * @param gen Shared pseudo-random generator used to sample inter-arrival times.
 		 */
-		source(vector<double> r, string description, shared_ptr<mt19937_64> gen);
+		source(vector<shared_ptr<T<TT>>> rand_dist, string description);
 		/**
-		 * @brief Construct a one-class source without configuring arrival rates.
+		 * @brief Construct a one-class source without configuring its distribution.
 		 *
 		 * This constructor is useful for tests and custom subclasses. Calling
-		 * get_service() requires a configured exponential distribution, so the
-		 * rate-based constructor is the usual simulation entry point.
+		 * get_service() requires a configured distribution, so the
+		 * distribution-based constructor is the usual simulation entry point.
 		 *
 		 * @param description String identifier.
 		 */
@@ -102,14 +108,25 @@ class des::source : public des::sourcesink
 			this -> sourcesink::clear();
 		}
 		/**
-		 * @brief Replace the exponential arrival rate for one class.
+		 * @brief Return the inter-arrival distribution of one class.
 		 *
-		 * @param rate New exponential distribution rate.
+		 * @param cls Event-class index.
+		 * @return The distribution, shared with the source: changing its
+		 *         parameters changes the arrivals the source generates.
+		 */
+		inline shared_ptr<T<TT>> get_rng(unsigned int cls) const
+		{
+			return rng.at(cls);
+		}
+		/**
+		 * @brief Replace the inter-arrival distribution of one class.
+		 *
+		 * @param dist New inter-arrival distribution.
 		 * @param cls Event-class index.
 		 */
-		inline void set_rate(double rate, int cls)
+		inline void set_rng(shared_ptr<T<TT>> dist, unsigned int cls)
 		{
-			exp.at(cls) = exponential_distribution<double>(rate);
+			rng.at(cls) = dist;
 		}
 		/**
 		 * @brief Return a human-readable source summary.
@@ -127,7 +144,6 @@ class des::source : public des::sourcesink
 		 */
 		double get_service(unsigned int& cls, unsigned int& idx) override;
 	private:
-        vector<double> rate; ///< Arrival rates configured at construction.
-        vector<exponential_distribution<double>> exp; ///< Per-class inter-arrival distributions.
+		vector<shared_ptr<T<TT>>> rng; ///< Per-class inter-arrival distributions.
 };
 #endif

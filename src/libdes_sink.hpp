@@ -21,9 +21,11 @@ namespace des
 /**
  * @brief Terminal node that consumes routed events.
  *
- * A sink accepts arrivals, immediately disposes departed events into the shared
- * source/sink event pool, and does not schedule any onward service time. It is
- * the usual terminal node for open networks.
+ * A sink absorbs every arrival at once: it records the arrival and the departure
+ * of the job at the same time (its observers see a zero sojourn), then disposes the
+ * event into the shared source/sink event pool. It never schedules a departure
+ * event, so network::next_event() returns no event from a sink. It is the usual
+ * terminal node for open networks.
  */
 class des::sink : public des::sourcesink
 {
@@ -36,9 +38,8 @@ class des::sink : public des::sourcesink
 		 *
 		 * @param r Unused placeholder service-rate vector.
 		 * @param description String identifier.
-		 * @param gen Unused pseudo-random generator.
 		 */
-		sink(vector<double> r, string description, mt19937_64& gen);
+		sink(vector<double> r, string description);
 		/**
 		 * @brief Construct a sink for a fixed number of event classes.
 		 *
@@ -56,6 +57,12 @@ class des::sink : public des::sourcesink
 		 * @brief Destroy the sink.
 		 */
 		~sink();
+		/**
+		 * @brief Absorb the arriving event: record its arrival and departure, then dispose it.
+		 *
+		 * @return Always true.
+		 */
+		bool arrival(const shared_ptr<event>& e) override;
 		/**
 		 * @brief Select the sink server for an arriving event.
 		 *
@@ -75,6 +82,9 @@ class des::sink : public des::sourcesink
 		int enqueue(const shared_ptr<event>& e, const vector<vector<int>>& q_map) override;
 		/**
 		 * @brief Dispose the completed event into the shared event pool.
+		 *
+		 * arrival() absorbs the jobs without holding them, so a sink never
+		 * reaches this method itself; it is kept to satisfy the node interface.
 		 *
 		 * @return Always 0.
 		 */

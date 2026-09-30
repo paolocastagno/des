@@ -7,6 +7,7 @@
 #include "libdes_queue.hpp"
 #include "libdes_const.hpp"
 
+#include <deque>
 #include <iostream>
 #include <string>
 #include <stdexcept>
@@ -49,21 +50,6 @@ class des::sourcesink : public des::node
 		 */
 		sourcesink(string description, int cls) : node::node(description, cls){};
 		/**
-		 * @brief Construct a one-class source/sink base node with a generator.
-		 *
-		 * @param description String identifier.
-		 * @param gen Shared pseudo-random generator.
-		 */
-		sourcesink(string description, shared_ptr<mt19937_64> gen) : node::node(description, gen){};
-		/**
-		 * @brief Construct a source/sink base node with classes and a generator.
-		 *
-		 * @param description String identifier.
-		 * @param cls Number of event classes.
-		 * @param gen Shared pseudo-random generator.
-		 */
-		sourcesink(string description, int cls, shared_ptr<mt19937_64> gen) : node::node(description, cls, gen){};
-		/**
 		 * @brief Destroy the source/sink base.
 		 */
 		virtual ~sourcesink() {}
@@ -83,7 +69,7 @@ class des::sourcesink : public des::node
 		shared_ptr<event> get_event()
 		{
 			// Resolve the thread_local pool once
-			list<shared_ptr<event>>& pool = events;
+			deque<shared_ptr<event>>& pool = events;
 			while(!pool.empty())
 			{
 				shared_ptr<event> ret = std::move(pool.front());
@@ -129,7 +115,7 @@ class des::sourcesink : public des::node
 			node::clear();
 		}
 	private:
-		inline static thread_local list<shared_ptr<event>> events = list<shared_ptr<event>>(); ///< Per-thread pool of reusable terminal/source events.
+		inline static thread_local deque<shared_ptr<event>> events = deque<shared_ptr<event>>(); ///< Per-thread pool of reusable terminal/source events (a deque: no allocation per event).
 };
 
 #endif

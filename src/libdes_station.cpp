@@ -10,10 +10,9 @@ namespace des
 							unsigned int q_places,
 							shared_ptr<policy> p_queue,
 							shared_ptr<policy> p_service,
-							string description,
-							shared_ptr<mt19937_64> gen) : 
+							string description) : 
 					node::node(rand_dist.at(0).size(),
-							description, gen),
+							description),
 		rng(rand_dist)
 	{
 		q_map.clear();
@@ -41,8 +40,7 @@ namespace des
 							shared_ptr<policy> p_queue,
 							shared_ptr<policy> p_service,
 							node::service_pick_handler shfunc,
-							string description,
-							shared_ptr<mt19937_64> gen) :
+							string description) :
 					station<TT, T>::station(rand_dist,
 							nserver,
 							s_places,
@@ -50,8 +48,7 @@ namespace des
 							q_places,
 							p_queue,
 							p_service,
-							description,
-							gen)
+							description)
 	{
 		set_service_pick_handler(shfunc);
 	}
@@ -62,8 +59,7 @@ namespace des
 							unsigned int s_places,
 							unsigned int nqueue,
 							unsigned int q_places,
-							string description,
-							shared_ptr<mt19937_64> gen) : 
+							string description) : 
 					station<TT, T>::station(rand_dist,
 										nserver,
 										s_places,
@@ -71,8 +67,7 @@ namespace des
 										q_places,
 										shared_ptr<policy>(new fifo()),
 										shared_ptr<policy>(new fifo()),
-										description,
-										gen)
+										description)
 	{}
 
 	template<typename TT, template <typename> typename T>
@@ -80,10 +75,9 @@ namespace des
 							unsigned int nserver,
 							unsigned int s_places,
 							shared_ptr<policy> p_service,
-							string description,
-							shared_ptr<mt19937_64> gen) : 
+							string description) : 
 					node::node(rand_dist.at(0).size(),
-							description, gen),
+							description),
 		rng(rand_dist)
 	{
 		q_map.clear();
@@ -102,14 +96,12 @@ namespace des
 							unsigned int s_places,
 							shared_ptr<policy> p_service,
 							node::service_pick_handler shfunc,
-							string description,
-							shared_ptr<mt19937_64> gen) :
+							string description) :
 					station<TT, T>::station(rand_dist,
 							nserver,
 							s_places,
 							p_service,
-							description,
-							gen)
+							description)
 	{
 		set_service_pick_handler(shfunc);
 	}
@@ -118,25 +110,21 @@ namespace des
 	station<TT, T>::station(vector<vector<shared_ptr<T<TT>>>> rand_dist,
 							unsigned int nserver,
 							unsigned int s_places,
-							string description,
-							shared_ptr<mt19937_64> gen) : 
+							string description) : 
 					station<TT, T>::station(rand_dist,
 											nserver,
 											s_places,
 											shared_ptr<is>(new is()),
-											description,
-											gen)
+											description)
 	{}
 
 	template<typename TT, template <typename> typename T>
 	station<TT, T>::station(vector<vector<shared_ptr<T<TT>>>> rand_dist,
-							string description,
-							shared_ptr<mt19937_64> gen) : 
+							string description) : 
 					station<TT, T>::station(rand_dist,
 											1,
 											numeric_limits<int>::max(),
-											description,
-											gen)
+											description)
 	{};
 
 	// template<typename T, typename S> station<T,S>::~station()
@@ -146,7 +134,7 @@ namespace des
 	template<typename TT, template <typename> typename T>
 	double station<TT, T>::get_service(unsigned int& cls, unsigned int& idx)
 	{
-		return (*(rng.at(idx).at(cls)))(*gen.get());
+		return (*(rng.at(idx).at(cls)))(service_stream(cls));
 	}
 
 	template<typename TT, template <typename> typename T>
@@ -155,117 +143,96 @@ namespace des
 		return rng.at(idx).at(cls);
 	}
 
+	namespace
+	{
+		/**
+		 * @brief Uniform choice among the indexes in [0, @p n) satisfying @p ok.
+		 *
+		 * Draws from @p g as picking from a vector of those indexes would, without allocating one.
+		 *
+		 * @return the chosen index, or -1 (drawing nothing) if no index satisfies @p ok
+		 */
+		template <typename Ok>
+		int pick(unsigned int n, Ok ok, random_engine& g)
+		{
+			unsigned int few[16];
+			vector<unsigned int> many;
+			unsigned int* idx = few;
+			if(n > 16)
+			{
+				many.resize(n);
+				idx = many.data();
+			}
+			unsigned int k = 0;
+			for(unsigned int i = 0; i < n; i++)
+			{
+				if(ok(i))
+				{
+					idx[k++] = i;
+				}
+			}
+			if(k == 0)
+			{
+				return -1;
+			}
+			uniform_int_distribution<int> d(0, static_cast<int>(k) - 1);
+			return static_cast<int>(idx[d(g)]);
+		}
+
+		/**
+		 * @brief Last index in [0, @p n) satisfying @p ok, -1 if none does
+		 */
+		template <typename Ok>
+		int last_of(unsigned int n, Ok ok)
+		{
+			for(unsigned int i = n; i-- > 0;)
+			{
+				if(ok(i))
+				{
+					return static_cast<int>(i);
+				}
+			}
+			return -1;
+		}
+	}
+
 	template<typename TT, template <typename> typename T>
 	int station<TT, T>::enqueue(const shared_ptr<event>& e, const vector<vector<int>>& q_map)
 	{
-		if(q_map.size() > 0)
-		{ 
-			int last = -1;
-			vector<unsigned int> indexes({});
-			for(unsigned int i = 0; i < q_map.size(); i++)
-			{
-				if(q_map.at(i).at(e->get_cls()) != 0)
-				{
-					last = static_cast<int>(i);
-					if(!q.at(i) -> is_full())
-					{
-						indexes.push_back(i);
-					}
-				}
-			}
-			if(indexes.size() == 0)
-			{
-				return last;
-			}
-			else
-			{
-				uniform_int_distribution<int> idx(0,indexes.size()-1);
-				return indexes.at(idx(*gen.get()));
-			}
-		}
-		return -1;
+		// A random queue with room among those of the class, else the last of the class
+		const unsigned int cls = e -> get_cls(), n = q_map.size();
+		auto mapped = [&](unsigned int i){ return q_map.at(i).at(cls) != 0; };
+		int chosen = pick(n, [&](unsigned int i){ return mapped(i) && !q.at(i) -> is_full(); }, choice_stream());
+		return chosen >= 0 ? chosen : last_of(n, mapped);
 	}
 
 	template<typename TT, template <typename> typename T>
 	int station<TT, T>::dequeue(const shared_ptr<event>& e, const vector<vector<int>>& q_map)
 	{
-		int last = -1;
-		if(q_map.size() > 0)
-		{
-			vector<unsigned int> indexes({});
-			for(unsigned int i = 0; i < q_map.size(); i++)
-			{
-				if(q_map.at(i).at(e->get_cls()) != 0)
-				{
-					last = static_cast<int>(i);
-					if(q.at(i) -> in_queue() != 0)
-					{
-						indexes.push_back(i);
-					}
-				} 
-			}
-			if(indexes.size() == 0)
-			{
-				return last;
-			}
-			else
-			{
-				uniform_int_distribution<int> idx(0,indexes.size()-1);
-				return indexes.at(idx(*gen.get()));
-			}
-		}
-		return -1;
+		// A random non-empty queue among those of the class, else the last of the class
+		const unsigned int cls = e -> get_cls(), n = q_map.size();
+		auto mapped = [&](unsigned int i){ return q_map.at(i).at(cls) != 0; };
+		int chosen = pick(n, [&](unsigned int i){ return mapped(i) && q.at(i) -> in_queue() != 0; }, choice_stream());
+		return chosen >= 0 ? chosen : last_of(n, mapped);
 	}
 
 	template<typename TT, template <typename> typename T>
 	int station<TT, T>::schedule(const shared_ptr<event>& e, const vector<vector<int>>& s_map)
 	{
-		if(s_map.size() > 0)
-		{
-			int last = -1;
-			vector<unsigned int> indexes({});
-			for(unsigned int i = 0; i < s_map.size(); i++)
-			{
-				if(s_map.at(i).at(e->get_cls()) != 0)
-				{
-					last = static_cast<int>(i);
-					if(!s.at(i) -> is_full())
-					{
-						indexes.push_back(i);
-					}
-				}
-			}
-			if(indexes.size() == 0)
-			{
-				return last;
-			}
-			else
-			{
-				uniform_int_distribution<int> idx(0,indexes.size()-1);
-				return indexes.at(idx(*gen.get()));
-			}
-		}
-		return -1;
+		// A random server with room among those of the class, else the last of the class
+		const unsigned int cls = e -> get_cls(), n = s_map.size();
+		auto mapped = [&](unsigned int i){ return s_map.at(i).at(cls) != 0; };
+		int chosen = pick(n, [&](unsigned int i){ return mapped(i) && !s.at(i) -> is_full(); }, choice_stream());
+		return chosen >= 0 ? chosen : last_of(n, mapped);
 	}
 
 	template<typename TT, template <typename> typename T>
-	int station<TT, T>::shfunc(const shared_ptr<event>&, int sched, const vector<vector<int>>&, const vector<shared_ptr<queue>>& queues, shared_ptr<mt19937_64>& g)
+	int station<TT, T>::shfunc(const shared_ptr<event>&, int sched, const vector<vector<int>>&, const vector<shared_ptr<queue>>& queues, random_engine& g)
 	{
+		// A random queue holding a job the freed server may serve
 		unsigned int srv = static_cast<unsigned int>(sched);
-		vector<unsigned int> indexes({});
-		for(unsigned int i = 0; i < queues.size(); i++)
-		{
-			if(queues.at(i) -> has_next([this, srv](const event& w){ return this -> can_serve(srv, static_cast<unsigned int>(w.get_cls())); }))
-			{
-				indexes.push_back(i);
-			}
-		}
-		if(indexes.size() == 0)
-		{
-			return -1;
-		}
-		uniform_int_distribution<int> idx(0,indexes.size()-1);
-		return indexes.at(idx(*g.get()));
+		const function<bool(const event&)> eligible = [this, srv](const event& w){ return this -> can_serve(srv, static_cast<unsigned int>(w.get_cls())); };
+		return pick(queues.size(), [&](unsigned int i){ return queues.at(i) -> has_next(eligible); }, g);
 	}
 
 	template<typename TT, template <typename> typename T>

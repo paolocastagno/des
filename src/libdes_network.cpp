@@ -3,13 +3,22 @@
 namespace des
 {
 	network::network(vector<shared_ptr<node>> nds, vector<vector<vector<double>>> rtg,
-					shared_ptr<mt19937_64>& g) :
+					uint64_t seed) :
 		nodes(nds),
 		routing(rtg.begin(), rtg.end()),
 		// handler(), 
-		gen(g)
+		route_streams()
 		{
 			set_sid("Network");
+			// Block 2i feeds node i, block 2i+1 routes the events leaving it
+			random_engine block(seed);
+			for(const shared_ptr<node>& n: nodes)
+			{
+				n -> set_streams(block);
+				block.long_jump();
+				route_streams.emplace_back(block);
+				block.long_jump();
+			}
 			// Function pointers default to nullptr and the default functions will be used;
 			max_reroute_attempts = max<unsigned int>(1, nodes.size());
 			for(unsigned int i = 0; i < routing.size(); i++)
@@ -35,29 +44,30 @@ namespace des
 			}
 			index_signals();
 			init_heap();
+			build_route_table();
 		}
 
 		network::network(vector<shared_ptr<node>> nds, vector<vector<vector<double>>> rtg,
-						int (*hffunc)(const shared_ptr<event>&, const vector<vector<vector<double>>>&, shared_ptr<mt19937_64>&),
-						shared_ptr<mt19937_64>& g) : network::network(nds, rtg, g)
+						int (*hffunc)(const shared_ptr<event>&, const vector<vector<vector<double>>>&, random_engine&),
+						uint64_t seed) : network::network(nds, rtg, seed)
 		{
 			handle_forks = hffunc;
 		}
 
 		network::network(vector<shared_ptr<node>> nds, vector<vector<vector<double>>> rtg,
 						pair<bool, int> (*hbfunc)(const shared_ptr<event>&, int,
-												const vector<vector<vector<double>>>&, shared_ptr<mt19937_64>&),
-						shared_ptr<mt19937_64>& g) : network::network(nds, rtg, g)
+												const vector<vector<vector<double>>>&, random_engine&),
+						uint64_t seed) : network::network(nds, rtg, seed)
 		{
 			handle_block = hbfunc;
 		}
 
 		network::network(vector<shared_ptr<node>> nds, vector<vector<vector<double>>> rtg,
 							int (*hffunc)(const shared_ptr<event>&, const vector<vector<vector<double>>>&,
-										shared_ptr<mt19937_64>&),
+										random_engine&),
 							pair<bool, int> (*hbfunc)(const shared_ptr<event>&, int,
-							const vector<vector<vector<double>>>&, shared_ptr<mt19937_64>&),
-						shared_ptr<mt19937_64>& g) : network::network(nds, rtg, g)
+							const vector<vector<vector<double>>>&, random_engine&),
+						uint64_t seed) : network::network(nds, rtg, seed)
 		{
 			handle_forks = hffunc;
 			handle_block = hbfunc;
@@ -162,6 +172,11 @@ namespace des
 			}
 			return;
 		}
+		if(p >= 0 && node_heap_time[idx] == t)
+		{
+			// Unchanged: the heap is already in order
+			return;
+		}
 		node_heap_time[idx] = t;
 		if(p < 0)
 		{
@@ -235,18 +250,68 @@ namespace des
 		lists_owner = this;
 	}
 
-	pair<bool, int> network::hbfunc(const shared_ptr<event>&, int, const vector<vector<vector<double>>>&, shared_ptr<mt19937_64>&)
+	void network::build_route_table()
+	{
+		route_table.assign(routing.size(), vector<vector<pair<int, double>>>());
+		for(size_t i = 0; i < routing.size(); i++)
+		{
+			// Events leaving node i may belong to any class routed on one of its edges
+			size_t classes = 0;
+			for(const vector<double>& edge_cls: routing[i])
+			{
+				classes = max(classes, edge_cls.size());
+			}
+			route_table[i].resize(classes);
+			for(size_t c = 0; c < classes; c++)
+			{
+				vector<pair<int, double>> row;
+				double cum = 0.0;
+				bool complete = true;
+				for(size_t j = 0; j < routing[i].size() && complete; j++)
+				{
+					// Each edge lists its own classes: leave the row to the scan if one misses c
+					complete = c < routing[i][j].size();
+					if(complete && routing[i][j][c] != 0.0)
+					{
+						cum += routing[i][j][c];
+						row.emplace_back(static_cast<int>(j), cum);
+					}
+				}
+				if(complete)
+				{
+					route_table[i][c] = std::move(row);
+				}
+			}
+		}
+	}
+
+	pair<bool, int> network::hbfunc(const shared_ptr<event>&, int, const vector<vector<vector<double>>>&, random_engine&)
 	{
 		return make_pair<bool, int>(false, 0);
 	}
 	
-	int network::hffunc(const shared_ptr<event>& e, const vector<vector<vector<double>>>& route, shared_ptr<mt19937_64>& g)
+	int network::hffunc(const shared_ptr<event>& e, const vector<vector<vector<double>>>& route, random_engine& g)
 	{
 		uniform_real_distribution<double> dist;
 		int i = 0;
-		double rnd = dist(*g.get()), cum = 0.0;
-		const vector<vector<double>>& rtg_vec = route.at(e -> get_info(tags::EVENT_NODE).second);
+		double rnd = dist(g), cum = 0.0;
+		const size_t source = static_cast<size_t>(e -> get_info(tags::EVENT_NODE).second);
 		const int cls = e -> get_cls();
+		// The table holds the partial sums of the scan below at its nonzero entries, so it
+		// yields the same destination; with rnd = 0 the scan may stop on a zero entry instead
+		if(&route == &routing && rnd > 0.0 && source < route_table.size()
+			&& static_cast<size_t>(cls) < route_table[source].size() && !route_table[source][cls].empty())
+		{
+			for(const pair<int, double>& dest: route_table[source][cls])
+			{
+				if(dest.second >= rnd)
+				{
+					return dest.second > rnd ? dest.first : -1;
+				}
+			}
+			return -1;
+		}
+		const vector<vector<double>>& rtg_vec = route.at(source);
 		do
 		{
 			cum += rtg_vec.at(i).at(cls);
@@ -322,14 +387,15 @@ namespace des
 			throw runtime_error("network::route failed to recover the current node id\n");
 		}
 		int source = static_cast<int>(node.second);
+		random_engine& g = route_streams.at(source).at(static_cast<size_t>(e -> get_cls()));
 		int dest;
 		if(handle_forks != nullptr)
 		{
-			dest = handle_forks(e, routing, gen);
+			dest = handle_forks(e, routing, g);
 		}
 		else
 		{
-			dest = hffunc(e, routing, gen);
+			dest = hffunc(e, routing, g);
 		}
 		// A destination outside the routing row means the event leaves the network
 		if(dest < 0 || static_cast<unsigned int>(dest) >= routing.at(source).size())
@@ -348,11 +414,11 @@ namespace des
 			pair<bool, int> reroute;
 			if(handle_block != nullptr)
 			{
-				reroute = handle_block(e, blocked, routing, gen);
+				reroute = handle_block(e, blocked, routing, g);
 			}
 			else
 			{
-				reroute = hbfunc(e, blocked, routing, gen);
+				reroute = hbfunc(e, blocked, routing, g);
 			}
 			if(!reroute.first || reroute.second < 0 || static_cast<unsigned int>(reroute.second) >= nodes.size())
 			{

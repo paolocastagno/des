@@ -90,11 +90,11 @@ TEST_CASE("nodes added after the others leave their streams unchanged", "[unit][
 {
 	auto run = [](bool extra)
 	{
-		auto src = std::make_shared<des::source>(std::vector<double>{0.8}, "src");
+		auto src = poisson_source({0.8}, "src");
 		std::vector<std::shared_ptr<des::node>> nodes{src, mm_station(1.0), std::make_shared<des::sink>("snk")};
 		std::vector<int> next{1, 2, -1};
 		// A second source and station, drawing their own random numbers, feeding the same sink
-		auto src2 = std::make_shared<des::source>(std::vector<double>{0.5}, "src2");
+		auto src2 = poisson_source({0.5}, "src2");
 		if(extra)
 		{
 			nodes.push_back(src2);
@@ -114,7 +114,7 @@ TEST_CASE("the arrivals of a class do not depend on the rates of the other class
 {
 	auto arrivals = [](double rate1)
 	{
-		auto src = std::make_shared<des::source>(std::vector<double>{1.0, rate1}, "src");
+		auto src = poisson_source({1.0, rate1}, "src");
 		auto snk = std::make_shared<des::sink>("snk", 2);
 		des::network net({src, snk}, chain({1, -1}, 2), 3);
 		for(int c = 0; c < 2; c++) src -> arrival(make_event(c, 0.0));
