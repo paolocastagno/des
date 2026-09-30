@@ -28,7 +28,7 @@ You build a model from C++ objects: sources that generate jobs, stations that qu
 ### Performance and testing
 
 - **Built for long runs.** Event fields are addressed by integer tags rather than strings. The next event comes from an indexed heap over the nodes. Events are recycled through a pool, and the job stores do not allocate memory per job in steady state. `make bench` measures events per second on your machine.
-- **Checked against theory.** Besides unit and regression tests, the suite compares simulated estimates with exact results: M/M/1, Erlang B and C, Pollaczek–Khinchine, processor-sharing insensitivity, a Jackson tandem, and mean value analysis of a closed network. The tests also run under AddressSanitizer, UndefinedBehaviorSanitizer and ThreadSanitizer. CI runs all of this on Linux and macOS on every push. See [Testing](docs/testing.md).
+- **Checked against theory.** Besides unit and regression tests, the suite compares simulated estimates with exact results: M/M/1, Erlang B and C, Pollaczek–Khinchine, processor-sharing insensitivity, a Jackson tandem, and mean value analysis of a closed network. The tests also run under AddressSanitizer, UndefinedBehaviorSanitizer and ThreadSanitizer. See [Testing](docs/testing.md).
 
 ## How it works
 
@@ -239,10 +239,6 @@ src/     library sources; public headers are src/libdes_*.hpp
 test/    test.cpp: M/M/1 and M/M/2 models checked against queueing theory
 docs/    user guide and API reference
 ```
-
-## Notes
-
-- The library is not thread-safe. To run replications in parallel, use separate processes.
 
 ## Contact
 
