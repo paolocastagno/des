@@ -114,6 +114,9 @@ endif
 uninstall:
 			sudo $(RM) "$(SODIR)/libdes.$(SOEXT)"
 			sudo $(RM) "$(HDIR)/incbeta.hpp" "$(HDIR)"/libdes_*.hpp
+ifneq ($(OS),Darwin)
+			sudo ldconfig
+endif
 
 # Linking the executable from the object files
 libdes:  $(OBJECTS)
