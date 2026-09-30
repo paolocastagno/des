@@ -7,8 +7,10 @@ CXXSTD ?= c++23
 CSTD = -std=$(CXXSTD)
 BUILD ?= release
 TEST_BIN ?= test/test
-TEST_EVENTS ?= 100000
-TEST_RUNS ?= 5
+TEST_TOLERANCE ?= 0.01
+TEST_RUN_TOLERANCE ?= 0.05
+TEST_MIN_RUNS ?= 10
+TEST_MIN_CYCLES ?= 30
 LINK_INSTALLED ?= 1
 PROFILE_DIR ?= profile
 PROFILE_WARMUP_SECONDS ?= 0.2
@@ -50,14 +52,15 @@ endif
 ifeq ($(BUILD),debug)
     BUILD_FLAGS = -DDEBUG -O0 -g -ggdb
 else ifeq ($(BUILD),release)
-    BUILD_FLAGS = -DNDEBUG -O3
+    # -flto lets the compiler inline across source files (e.g. the queue queries in node.cpp)
+    BUILD_FLAGS = -DNDEBUG -O3 -flto
 else ifeq ($(BUILD),profile)
     BUILD_FLAGS = -DNDEBUG -O3 -g -fno-omit-frame-pointer
 else
 $(error BUILD must be debug, release, or profile)
 endif
 CXXFLAGS = $(CSTD) $(BUILD_FLAGS) $(PICFLAGS)
-TEST_CXXFLAGS = -DDES_TEST_EVENTS=$(TEST_EVENTS) -DDES_TEST_RUNS=$(TEST_RUNS)
+TEST_CXXFLAGS = -DDES_TEST_TOLERANCE=$(TEST_TOLERANCE) -DDES_TEST_RUN_TOLERANCE=$(TEST_RUN_TOLERANCE) -DDES_TEST_MIN_RUNS=$(TEST_MIN_RUNS) -DDES_TEST_MIN_CYCLES=$(TEST_MIN_CYCLES)
 
 # Use local source headers, not installed ones
 INCLUDES := -I src
@@ -114,7 +117,7 @@ uninstall:
 
 # Linking the executable from the object files
 libdes:  $(OBJECTS)
-			$(CXX) $(WARNING) -shared $(LDFLAGS) $^ -o $@.$(SOEXT)
+			$(CXX) $(WARNING) $(BUILD_FLAGS) -shared $(LDFLAGS) $^ -o $@.$(SOEXT)
 -include $(DEPENDS)
 
 %.o: %.cpp Makefile
@@ -169,7 +172,7 @@ CHECK_FLAGS     = -O2 -g
 SANITIZE_FLAGS  = -O1 -g -fno-omit-frame-pointer -fsanitize=address,undefined -fno-sanitize-recover=undefined
 TSAN_FLAGS      = -O1 -g -fno-omit-frame-pointer -fsanitize=thread
 COVERAGE_FLAGS  = -O0 -g -fprofile-instr-generate -fcoverage-mapping
-BENCH_FLAGS     = -O3 -DNDEBUG
+BENCH_FLAGS     = -O3 -DNDEBUG -flto
 COVERAGE_IGNORE = (test/|/usr/|/Library/|/opt/)
 
 ifeq ($(OS),Darwin)

@@ -1,5 +1,7 @@
 #include <algorithm>
+#include <cmath>
 #include <memory>
+#include <random>
 #include <stdexcept>
 #include <vector>
 
@@ -93,6 +95,74 @@ TEST_CASE("for_each lets times change and restores the order", "[unit][store]")
 		s -> for_each([](des::event& e){ e.set_time(10.0 - e.get_time()); });
 		CHECK(s -> next() == c);
 		CHECK((drain(*s) == std::vector<std::shared_ptr<des::event>>{c, b, a}));
+	}
+}
+
+TEST_CASE("sequence_store matches a reference model through growth and wrap-around", "[unit][store]")
+{
+	// Reference: a vector kept in time order, ties in arrival order
+	using jobs_t = std::vector<std::shared_ptr<des::event>>;
+	auto odd = [](const des::event& e){ return e.get_cls() == 1; };
+	for(bool fifo : {true, false})
+	{
+		des::sequence_store s(fifo);
+		jobs_t ref;
+		des::random_engine g(99);
+		std::uniform_int_distribution<int> op(0, 99), cls(0, 1), ahead(0, 3);
+		double clock = 0.0;
+		size_t largest = 0;
+		for(int i = 0; i < 20000; i++)
+		{
+			// Alternate phases that fill the store (growing its room) and drain it (moving its start)
+			bool filling = (i / 1000) % 2 == 0;
+			int pushes = filling ? 60 : 30, pops = filling ? 20 : 45;
+			int o = op(g);
+			if(o < pushes)
+			{
+				// Mostly in time order, sometimes earlier than the last job, with ties
+				clock += 0.5 * ahead(g);
+				auto e = job(ahead(g) == 0 ? clock - 1.0 : clock, cls(g));
+				s.push(e, 0.0);
+				auto at = std::upper_bound(ref.begin(), ref.end(), e, [](const std::shared_ptr<des::event>& a, const std::shared_ptr<des::event>& b){ return a -> get_time() < b -> get_time(); });
+				ref.insert(at, e);
+			}
+			else if(o < pushes + pops && !ref.empty())
+			{
+				auto expected = fifo ? ref.front() : ref.back();
+				REQUIRE(s.next() == expected);
+				REQUIRE(s.pop(0.0) == expected);
+				if(fifo) ref.erase(ref.begin()); else ref.pop_back();
+			}
+			else if(o < pushes + pops + 12)
+			{
+				// First eligible job in release order
+				long found = -1;
+				for(size_t k = 0; k < ref.size() && found < 0; k++)
+				{
+					size_t idx = fifo ? k : ref.size() - 1 - k;
+					if(odd(*ref[idx])) found = static_cast<long>(idx);
+				}
+				REQUIRE(s.has(odd) == (found >= 0));
+				auto got = s.pop_first(odd, 0.0);
+				REQUIRE(got == (found >= 0 ? ref[found] : nullptr));
+				if(found >= 0) ref.erase(ref.begin() + found);
+			}
+			else if(o < pushes + pops + 14)
+			{
+				// Times change out of order: both restore it, keeping the order of ties
+				s.for_each([](des::event& e){ e.set_time(std::fmod(e.get_time(), 7.0)); });
+				std::stable_sort(ref.begin(), ref.end(), [](const std::shared_ptr<des::event>& a, const std::shared_ptr<des::event>& b){ return a -> get_time() < b -> get_time(); });
+			}
+			else if(i % 5000 == 4999)
+			{
+				s.clear();
+				ref.clear();
+			}
+			REQUIRE(s.size() == ref.size());
+			largest = std::max(largest, ref.size());
+		}
+		CHECK(largest > 100);
+		CHECK((drain(s) == (fifo ? ref : jobs_t(ref.rbegin(), ref.rend()))));
 	}
 }
 
@@ -244,8 +314,7 @@ namespace
 TEST_CASE("a user-defined LIFO policy serves the latest arrival", "[unit][policy]")
 {
 	using namespace des_models;
-	auto gen = engine(1);
-	det_station sta(det_dists{{fixed(10)}}, 1, 1, 1, INT_MAX, std::make_shared<lifo>(), std::make_shared<des::fifo>(), "lifo", gen);
+	det_station sta(det_dists{{fixed(10)}}, 1, 1, 1, INT_MAX, std::make_shared<lifo>(), std::make_shared<des::fifo>(), "lifo");
 	arrive(sta, 0, 0.0);
 	auto first = arrive(sta, 0, 1.0);
 	arrive(sta, 0, 2.0);
@@ -259,9 +328,8 @@ TEST_CASE("a user-defined LIFO policy serves the latest arrival", "[unit][policy
 TEST_CASE("a user-defined priority policy needs no library change", "[unit][policy]")
 {
 	using namespace des_models;
-	auto gen = engine(2);
 	des::tag prio = des::tag_registry::define("unit_test_priority_level");
-	det_station sta(det_dists{{fixed(10)}}, 1, 1, 1, INT_MAX, std::make_shared<priority>(prio), std::make_shared<des::fifo>(), "prio", gen);
+	det_station sta(det_dists{{fixed(10)}}, 1, 1, 1, INT_MAX, std::make_shared<priority>(prio), std::make_shared<des::fifo>(), "prio");
 	auto with_prio = [&](double t, double p)
 	{
 		auto e = make_event(0, t);

@@ -66,7 +66,7 @@ void ps_store::push(const shared_ptr<event>& e, double now)
     // The node sets the time of an arriving job to now + its service requirement
     double service = e->get_time() - now;
     jobs.push_back(entry{vtime + service / weight(cls), seq++, e});
-    push_heap(jobs.begin(), jobs.end(), after);
+    push_heap(jobs.begin(), jobs.end(), after());
     count(cls, +1);
     schedule_next();
 }
@@ -94,7 +94,7 @@ void ps_store::departed(const shared_ptr<event>& e, double now)
 shared_ptr<event> ps_store::pop(double now)
 {
     advance(now);
-    pop_heap(jobs.begin(), jobs.end(), after);
+    pop_heap(jobs.begin(), jobs.end(), after());
     shared_ptr<event> e = std::move(jobs.back().job);
     jobs.pop_back();
     departed(e, now);
@@ -108,14 +108,14 @@ shared_ptr<event> ps_store::pop_first(const function<bool(const event&)>& eligib
     auto best = jobs.end();
     for(auto it = jobs.begin(); it != jobs.end(); ++it)
     {
-        if(eligible(*it->job) && (best == jobs.end() || after(*best, *it)))
+        if(eligible(*it->job) && (best == jobs.end() || after()(*best, *it)))
             best = it;
     }
     if(best == jobs.end())
         return nullptr;
     shared_ptr<event> e = std::move(best->job);
     jobs.erase(best);
-    make_heap(jobs.begin(), jobs.end(), after);
+    make_heap(jobs.begin(), jobs.end(), after());
     departed(e, now);
     return e;
 }
@@ -147,7 +147,7 @@ void ps_store::for_each(const function<void(event&)>& f)
     anchor = t0;
     for(entry& en : jobs)
         en.finish = (en.job->get_time() - t0) / total;
-    make_heap(jobs.begin(), jobs.end(), after);
+    make_heap(jobs.begin(), jobs.end(), after());
     schedule_next();
 }
 

@@ -117,9 +117,9 @@ virtual void   clear() = 0;
 
 | Store | Order | Container | Complexity |
 |---|---|---|---|
-| `des::sequence_store(true)` | earliest time first (FIFO), ties in arrival order | `std::deque` kept in time order | O(1) append for jobs arriving in time order, O(1) release |
+| `des::sequence_store(true)` | earliest time first (FIFO), ties in arrival order | ring buffer in a `std::vector`, kept in time order | O(1) append for jobs arriving in time order, O(1) release |
 | `des::sequence_store(false)` | latest time first (LIFO) | same | same |
-| `des::time_store` | earliest time first, ties in arrival order | binary heap in a `std::vector` | O(log n) insert and release |
+| `des::time_store` | earliest time first, ties in arrival order | binary heap in a `std::vector` (each entry caches its job's time) | O(log n) insert and release |
 | `des::ps_store` | earliest departure first, tracked in virtual time | heap on virtual finish tags | O(log n + C) per arrival/departure (C = number of classes) |
 
 None of them allocates per job in steady state.
@@ -203,8 +203,7 @@ auto sta = std::make_shared<des::station<double, exponential_distribution>>(
     1,                                         // 1 server
     std::numeric_limits<unsigned int>::max(),  // unlimited capacity → never full
     ps_policy,
-    "PS station",
-    gen);
+    "PS station");
 
 // GPS station: class 0 gets twice the share of class 1
 auto gps_policy = std::make_shared<des::ps>(std::vector<double>{2.0, 1.0});
@@ -288,7 +287,7 @@ struct priority : des::policy
 // use it for the waiting queue of a station
 des::tag prio = des::tag_registry::define("priority");
 auto sta = std::make_shared<des::station<double, exponential_distribution>>(
-    dists, 1, 1, 1, INT_MAX, std::make_shared<priority>(prio), std::make_shared<des::fifo>(), "PRIO", gen);
+    dists, 1, 1, 1, INT_MAX, std::make_shared<priority>(prio), std::make_shared<des::fifo>(), "PRIO");
 ```
 
 A store whose jobs' departure times depend on the other jobs held (as in processor sharing) can keep its own ordering key, as `ps_store` does with virtual finish tags, and keep the next job's event time up to date: nodes only read the time of `next()`.

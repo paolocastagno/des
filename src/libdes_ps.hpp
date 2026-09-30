@@ -117,11 +117,17 @@ class des::ps_store : public des::job_store
 		double anchor = 0.0;             ///< real time of the last update of `vtime`
 		unsigned long long seq = 0;
 
-		/** Heap order: tells whether @p a departs after @p b. */
-		static inline bool after(const entry& a, const entry& b)
+		/**
+		 * Heap order: tells whether @p a departs after @p b. A function object rather than a
+		 * function, so that the heap algorithms inline the comparison.
+		 */
+		struct after
 		{
-			return a.finish > b.finish || (a.finish == b.finish && a.seq > b.seq);
-		}
+			bool operator()(const entry& a, const entry& b) const
+			{
+				return a.finish > b.finish || (a.finish == b.finish && a.seq > b.seq);
+			}
+		};
 		/** Returns the weight of class @p cls (defaults to 1 if it has none). */
 		double weight(int cls) const;
 		/** Advances the virtual time to real time @p now. */

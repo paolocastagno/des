@@ -1,7 +1,6 @@
 #ifndef STORE_H
 #define STORE_H
 
-#include <deque>
 #include <functional>
 #include <memory>
 #include <vector>
@@ -91,7 +90,29 @@ class des::sequence_store : public des::job_store
 		void clear() override;
 	private:
 		bool front;
-		deque<shared_ptr<event>> jobs;
+		/**
+		 * @brief Ring buffer: job i, in time order, is ring[(head + i) & (ring.size() - 1)];
+		 *        its size is zero or a power of two
+		 */
+		vector<shared_ptr<event>> ring;
+		size_t head = 0;
+		size_t count = 0;
+		inline shared_ptr<event>& at(size_t i)
+		{
+			return ring[(head + i) & (ring.size() - 1)];
+		}
+		inline const shared_ptr<event>& at(size_t i) const
+		{
+			return ring[(head + i) & (ring.size() - 1)];
+		}
+		/**
+		 * @brief Index, in time order, of the first job in release order satisfying @p eligible, count if none
+		 */
+		size_t find(const function<bool(const event&)>& eligible) const;
+		/**
+		 * @brief Double the room, keeping the jobs in order
+		 */
+		void grow();
 };
 
 /**
@@ -114,6 +135,7 @@ class des::time_store : public des::job_store
 	protected:
 		struct entry
 		{
+			double time;              ///< the job's time, cached so comparisons do not reach the event
 			unsigned long long seq;   ///< arrival order, breaks ties between equal times
 			shared_ptr<event> job;
 		};
@@ -126,8 +148,7 @@ class des::time_store : public des::job_store
 		 */
 		static inline bool before(const entry& a, const entry& b)
 		{
-			double ta = a.job -> get_time(), tb = b.job -> get_time();
-			return ta < tb || (ta == tb && a.seq < b.seq);
+			return a.time < b.time || (a.time == b.time && a.seq < b.seq);
 		}
 		/**
 		 * @brief Removes and returns the job at heap position @p i

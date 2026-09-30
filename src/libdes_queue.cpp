@@ -26,53 +26,44 @@ namespace des{
             return false;
         }
         jobs -> push(e, time);
+        ++held;
         return true;
     }
 
     shared_ptr<event> queue::dequeue()
     {
-        if(jobs -> size() == 0)
+        if(held == 0)
         {
             throw runtime_error("des::queue trying to dequeue from an empty queue");
         }
-        return jobs -> pop(min_time());
+        double t = min_time();
+        --held;
+        return jobs -> pop(t);
     }
 
     shared_ptr<event> queue::dequeue(double time)
     {
-        if(jobs -> size() == 0)
+        if(held == 0)
         {
             throw runtime_error("des::queue trying to dequeue from an empty queue");
         }
+        --held;
         return jobs -> pop(time);
     }
 
     shared_ptr<event> queue::dequeue_next(const function<bool(const event&)>& eligible, double time)
     {
-        return jobs -> pop_first(eligible, time);
+        shared_ptr<event> e = jobs -> pop_first(eligible, time);
+        if(e != nullptr)
+        {
+            --held;
+        }
+        return e;
     }
 
     bool queue::has_next(const function<bool(const event&)>& eligible) const
     {
         return jobs -> has(eligible);
-    }
-
-    double queue::min_time() const
-    {
-        if(jobs -> size() > 0)
-            return jobs -> next() -> get_time();
-        else
-            return __DBL_MAX__;
-    }
-
-    bool queue::is_full() const
-    {
-        return jobs -> size() >= pos;
-    }
-
-    int queue::in_queue() const
-    {
-        return static_cast<int>(jobs -> size());
     }
 
     void queue::reset(double time, vector<tag> keys, bool)
@@ -83,6 +74,7 @@ namespace des{
     void queue::clear()
     {
         jobs -> clear();
+        held = 0;
     }
 
     int queue::get_positions() const

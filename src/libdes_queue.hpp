@@ -62,7 +62,7 @@ class des::queue : public des::object
 		 */
 		inline int size() const
 		{
-			return static_cast<int>(jobs -> size());
+			return static_cast<int>(held);
 		}
 		/**
 		 * @brief
@@ -110,21 +110,30 @@ class des::queue : public des::object
         *
         * @return its time, or __DBL_MAX__ if the queue is empty
         */
-        double min_time() const;
+        inline double min_time() const
+        {
+            return held > 0 ? jobs -> next() -> get_time() : __DBL_MAX__;
+        }
         /**
 		 * @brief Inspects whether the queue is full or not
 		 *
 		 * @return whether the queue is full or not
 		 *
 		 */
-        bool is_full() const;
+        inline bool is_full() const
+        {
+            return held >= pos;
+        }
         /**
 		 * @brief Inspects the number of places in use
 		 *
 		 * @return the number of places in use
 		 *
 		 */
-        int in_queue() const;
+        inline int in_queue() const
+        {
+            return static_cast<int>(held);
+        }
         /**
 		 * @brief reset the events' happening time according to a modification of the global time
 		 *
@@ -168,6 +177,7 @@ class des::queue : public des::object
         unsigned int pos;
         shared_ptr<policy> p;
         unique_ptr<job_store> jobs;
+        size_t held = 0;   ///< number of jobs in the store, kept by the methods that change it
 		inline static atomic<unsigned int> id_gen{0};
 };
 
