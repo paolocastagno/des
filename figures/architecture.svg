@@ -1,6 +1,6 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 660" width="1000" height="660" role="img" aria-labelledby="title desc">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 920" width="1000" height="920" role="img" aria-labelledby="title desc">
   <title id="title">libdes architecture</title>
-  <desc id="desc">A des::network holds the nodes (source, station, sink), a next-event heap, the routing matrix and flow statistics. Each simulation step takes the node with the earliest completion from the heap, lets its next job depart, samples the next node from the routing matrix and hands the job to that node, which puts it in a free server or a waiting queue. Every queue delegates admission and ordering to a policy, which creates the job store holding its jobs. Observers attached to node signals receive the event fields as a message and keep per-class statistics across runs.</desc>
+  <desc id="desc">A des::network, seeded once, holds the nodes, a next-event heap, the per-class routing matrix and flow statistics. Here the nodes form a central server model: a source, a processor-sharing CPU, a FIFO disk and a sink; after each CPU burst a job of class c visits the disk with probability p[c], then returns to the CPU, and otherwise leaves through the sink. Each simulation step takes the node with the earliest departure from the heap, lets its next job depart, samples the next node from the routing matrix and hands the job to that node, which puts it in a free server or a waiting queue. The source keeps one pending arrival per class and draws the inter-arrival times from a distribution per class. The sink absorbs jobs on arrival and never enters the heap. Every node draws from its own block of random streams of one xoshiro256** generator: stream 0 for its choices among queues and servers, stream 1 + c for the times of class c; the routing out of node i draws from the next block, one stream per class. Every queue delegates admission and ordering to a policy, which creates the job store holding its jobs: fifo a sequence_store (ring buffer), is a time_store (binary heap), ps a ps_store (heap in virtual time). Observers attached to node signals receive the event fields as a message and keep per-class statistics across runs.</desc>
   <style>
     .bg { fill: #ffffff; }
     text { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans", Helvetica, Arial, sans-serif; font-size: 12px; fill: #1f2328; }
@@ -11,15 +11,20 @@
     .mut { fill: #59636e; }
     .frame { fill: none; stroke: #d1d9e0; stroke-width: 1.5; }
     .box { fill: #f6f8fa; stroke: #818b98; stroke-width: 1.2; }
+    .blk2 { fill: #e6eaef; stroke: #818b98; stroke-width: 1.2; }
     .dash { stroke-dasharray: 5 3; }
     .ln { fill: none; stroke: #59636e; stroke-width: 1.3; }
     .lnf { fill: #59636e; }
     .lead { fill: none; stroke: #818b98; stroke-width: 1; stroke-dasharray: 2 3; }
     .acc { fill: none; stroke: #0969da; stroke-width: 1.8; }
     .accf { fill: #0969da; }
+    .c0f { fill: #bc4c00; }
+    .c1f { fill: #8250df; }
     .q { fill: none; stroke: #1f2328; stroke-width: 1.3; }
+    .term { stroke: #1f2328; stroke-width: 2.6; }
     .srv { fill: #ffffff; stroke: #1f2328; stroke-width: 1.3; }
-    .job { fill: #818b98; }
+    .die { fill: #ffffff; stroke: #1f2328; stroke-width: 1.1; }
+    .pip { fill: #1f2328; }
     .badge text { fill: #ffffff; font-size: 10px; font-weight: 700; }
     @media (prefers-color-scheme: dark) {
       .bg { fill: #0d1117; }
@@ -27,14 +32,19 @@
       .mut { fill: #9198a1; }
       .frame { stroke: #3d444d; }
       .box { fill: #151b23; stroke: #656c76; }
+      .blk2 { fill: #262c36; stroke: #656c76; }
       .ln { stroke: #9198a1; }
       .lnf { fill: #9198a1; }
       .lead { stroke: #656c76; }
       .acc { stroke: #4493f8; }
       .accf { fill: #4493f8; }
+      .c0f { fill: #f0883e; }
+      .c1f { fill: #ab7df8; }
       .q { stroke: #e6edf3; }
+      .term { stroke: #e6edf3; }
       .srv { fill: #0d1117; stroke: #e6edf3; }
-      .job { fill: #9198a1; }
+      .die { fill: #0d1117; stroke: #e6edf3; }
+      .pip { fill: #e6edf3; }
       .badge text { fill: #0d1117; }
     }
   </style>
@@ -47,47 +57,51 @@
     </marker>
   </defs>
 
-  <rect class="bg" width="1000" height="660"/>
+  <rect class="bg" width="1000" height="920"/>
 
-  <!-- Your program: drives the loop -->
-  <rect class="box" x="20" y="20" width="210" height="236" rx="8"/>
+  <!-- Your program: builds the network, drives the loop -->
+  <rect class="box" x="20" y="20" width="210" height="296" rx="8"/>
   <text class="h" x="36" y="44">Your program</text>
-  <text class="mono mut" x="36" y="70">// every event</text>
-  <text class="mono" x="36" y="90">e = net.next_event();</text>
-  <g class="badge"><circle class="accf" cx="44" cy="106" r="8"/><text x="44" y="109.5" text-anchor="middle">1</text></g>
-  <text x="58" y="110">heap picks a node</text>
-  <g class="badge"><circle class="accf" cx="44" cy="126" r="8"/><text x="44" y="129.5" text-anchor="middle">2</text></g>
-  <text x="58" y="130">its next job departs</text>
-  <text class="mono" x="36" y="156">net.route(e);</text>
-  <g class="badge"><circle class="accf" cx="44" cy="172" r="8"/><text x="44" y="175.5" text-anchor="middle">3</text></g>
-  <text x="58" y="176">routing picks next node</text>
-  <g class="badge"><circle class="accf" cx="44" cy="192" r="8"/><text x="44" y="195.5" text-anchor="middle">4</text></g>
-  <text x="58" y="196">job enters that node</text>
-  <text class="mono mut" x="36" y="222">// after each run</text>
-  <text class="mono" x="36" y="242">net.reset(t, keys, true);</text>
-
-  <!-- Shared random number generator -->
-  <rect class="box" x="20" y="346" width="210" height="94" rx="8"/>
-  <text class="mono b" x="36" y="370">std::mt19937_64</text>
-  <text x="36" y="392">one seeded generator for</text>
-  <text x="36" y="410">sources, stations and the</text>
-  <text x="36" y="428">routing: reproducible runs</text>
+  <text class="mono mut" x="36" y="70">// once</text>
+  <text class="mono" x="36" y="90">des::network net(nodes,</text>
+  <text class="mono" x="64" y="106">routing, seed);</text>
+  <text class="mono mut" x="36" y="132">// every event</text>
+  <text class="mono" x="36" y="152">e = net.next_event();</text>
+  <g class="badge"><circle class="accf" cx="44" cy="168" r="8"/><text x="44" y="171.5" text-anchor="middle">1</text></g>
+  <text x="58" y="172">heap picks a node</text>
+  <g class="badge"><circle class="accf" cx="44" cy="188" r="8"/><text x="44" y="191.5" text-anchor="middle">2</text></g>
+  <text x="58" y="192">its next job departs</text>
+  <text class="mono" x="36" y="218">net.route(e);</text>
+  <g class="badge"><circle class="accf" cx="44" cy="234" r="8"/><text x="44" y="237.5" text-anchor="middle">3</text></g>
+  <text x="58" y="238">routing picks next node</text>
+  <g class="badge"><circle class="accf" cx="44" cy="254" r="8"/><text x="44" y="257.5" text-anchor="middle">4</text></g>
+  <text x="58" y="258">job enters that node</text>
+  <text class="mono mut" x="36" y="284">// after each run</text>
+  <text class="mono" x="36" y="304">net.reset(t, keys, true);</text>
 
   <!-- Legend -->
-  <rect class="box dash" x="20" y="560" width="30" height="20" rx="4"/>
-  <text x="60" y="567">replaceable: pass or</text>
-  <text x="60" y="582">derive your own</text>
-  <line class="acc" x1="20" y1="616" x2="48" y2="616" marker-end="url(#head-acc)"/>
-  <text x="60" y="620">the simulation loop</text>
+  <rect class="box dash" x="20" y="340" width="30" height="20" rx="4"/>
+  <text x="60" y="347">replaceable: pass or</text>
+  <text x="60" y="362">derive your own</text>
+  <line class="acc" x1="20" y1="392" x2="48" y2="392" marker-end="url(#head-acc)"/>
+  <text x="60" y="396">the simulation loop</text>
+  <line class="ln" x1="20" y1="420" x2="48" y2="420" marker-end="url(#head-ln)"/>
+  <text x="60" y="424">a route between nodes</text>
+  <rect class="c0f" x="22" y="440" width="10" height="15"/>
+  <rect class="c1f" x="36" y="440" width="10" height="15"/>
+  <text x="60" y="452">jobs of class 0, class 1</text>
+  <g transform="translate(28,470)"><rect class="die" width="12" height="12" rx="2.5"/><circle class="pip" cx="3.5" cy="3.5" r="1.3"/><circle class="pip" cx="6" cy="6" r="1.3"/><circle class="pip" cx="8.5" cy="8.5" r="1.3"/></g>
+  <text x="60" y="480">block of random streams</text>
 
   <!-- des::network -->
-  <rect class="frame" x="250" y="20" width="730" height="420" rx="10"/>
+  <rect class="frame" x="250" y="20" width="730" height="474" rx="10"/>
   <text class="mono h" x="266" y="44">des::network</text>
+  <text class="s mut" x="964" y="44" text-anchor="end">a central server model: after each CPU burst, a class c job visits the disk with probability p[c]</text>
 
   <rect class="box" x="266" y="60" width="222" height="76" rx="6"/>
   <text class="h" x="280" y="84">next-event heap</text>
-  <text x="280" y="104">one entry per node, keyed</text>
-  <text x="280" y="120">by its earliest completion</text>
+  <text x="280" y="104">one entry per busy node,</text>
+  <text x="280" y="120">keyed by its next departure</text>
 
   <rect class="box" x="504" y="60" width="222" height="76" rx="6"/>
   <text class="mono b" x="518" y="84">routing[from][to][class]</text>
@@ -100,122 +114,244 @@
   <text x="756" y="104">events, throughput, blocked</text>
   <text x="756" y="120">per edge; losses per node</text>
 
-  <!-- step 1: the heap names the node with the earliest completion -->
-  <line class="acc" x1="316" y1="136" x2="316" y2="175" marker-end="url(#head-acc)"/>
-  <g class="badge"><circle class="accf" cx="316" cy="155" r="8"/><text x="316" y="158.5" text-anchor="middle">1</text></g>
-  <text class="s mut" x="330" y="159">earliest completion</text>
+  <!-- step 1: the heap names the node with the earliest departure -->
+  <line class="acc" x1="464" y1="136" x2="464" y2="175" marker-end="url(#head-acc)"/>
+  <g class="badge"><circle class="accf" cx="464" cy="155" r="8"/><text x="464" y="158.5" text-anchor="middle">1</text></g>
+  <text class="s mut" x="478" y="159">earliest departure</text>
 
   <!-- node boxes first, so the job paths are drawn over their borders -->
-  <rect class="box" x="266" y="176" width="100" height="244" rx="6"/>
-  <rect class="box" x="430" y="176" width="358" height="244" rx="6"/>
-  <rect class="box" x="852" y="176" width="112" height="244" rx="6"/>
+  <rect class="box" x="266" y="176" width="130" height="294" rx="6"/>
+  <rect class="box" x="440" y="176" width="280" height="110" rx="6"/>
+  <rect class="box" x="440" y="360" width="280" height="110" rx="6"/>
+  <rect class="box" x="824" y="176" width="140" height="294" rx="6"/>
 
-  <!-- des::source -->
-  <text class="mono b" x="278" y="200">des::source</text>
-  <text x="278" y="220">Poisson</text>
-  <text x="278" y="236">arrivals</text>
-  <circle class="srv" cx="316" cy="286" r="17"/>
-  <circle class="job" cx="316" cy="286" r="6"/>
-  <text class="s mut" x="316" y="322" text-anchor="middle">next arrival</text>
+  <!-- des::source: one pending arrival per class -->
+  <text class="mono b" x="278" y="198">des::source</text>
+  <text class="mono" x="278" y="214">&lt;TT, T&gt;</text>
+  <text class="s mut" x="384" y="214" text-anchor="end">node 0</text>
+  <circle class="srv" cx="331" cy="248" r="17"/>
+  <circle class="c0f" cx="325" cy="248" r="5"/>
+  <circle class="c1f" cx="337" cy="248" r="5"/>
+  <text x="278" y="292">one next arrival</text>
+  <text x="278" y="308">per class</text>
+  <rect class="box dash" x="278" y="320" width="106" height="40" rx="4"/>
+  <text class="s" x="287" y="336">inter-arrival</text>
+  <text class="mono s" x="287" y="352">T&lt;TT&gt;[class]</text>
+  <g transform="translate(278,372)"><rect class="die" width="12" height="12" rx="2.5"/><circle class="pip" cx="3.5" cy="3.5" r="1.3"/><circle class="pip" cx="6" cy="6" r="1.3"/><circle class="pip" cx="8.5" cy="8.5" r="1.3"/></g>
+  <text class="mono s" x="296" y="382">block 0</text>
 
-  <!-- steps 2-4: departure, route, arrival -->
-  <line class="acc" x1="333" y1="286" x2="444" y2="286"/>
-  <text class="mono s" x="398" y="270" text-anchor="middle">route()</text>
-  <g class="badge"><circle class="accf" cx="349" cy="286" r="8"/><text x="349" y="289.5" text-anchor="middle">2</text></g>
-  <g class="badge"><circle class="accf" cx="398" cy="286" r="8"/><text x="398" y="289.5" text-anchor="middle">3</text></g>
+  <!-- CPU: processor sharing, every job in service at once -->
+  <text class="b" x="452" y="198">CPU</text>
+  <text class="mono" x="484" y="198">des::station&lt;TT, T&gt;</text>
+  <text class="s mut" x="452" y="214">node 1 · processor sharing</text>
+  <text class="s mut" x="630" y="240" text-anchor="end">all jobs in service at once</text>
+  <circle class="srv" cx="660" cy="248" r="20"/>
+  <circle class="c0f" cx="652" cy="242" r="5"/>
+  <circle class="c1f" cx="668" cy="242" r="5"/>
+  <circle class="c0f" cx="660" cy="256" r="5"/>
+  <g transform="translate(452,266)"><rect class="die" width="12" height="12" rx="2.5"/><circle class="pip" cx="3.5" cy="3.5" r="1.3"/><circle class="pip" cx="6" cy="6" r="1.3"/><circle class="pip" cx="8.5" cy="8.5" r="1.3"/></g>
+  <text class="mono s" x="470" y="276">block 2</text>
+  <text class="mono s mut" x="540" y="276">ps → ps_store</text>
 
-  <!-- des::station -->
-  <text class="mono b" x="444" y="200">des::station&lt;TT, T&gt;</text>
+  <!-- Disk: FIFO -->
+  <text class="b" x="452" y="382">Disk</text>
+  <text class="mono" x="488" y="382">des::station&lt;TT, T&gt;</text>
+  <text class="s mut" x="452" y="398">node 2 · FIFO</text>
+  <path class="q" d="M470,420 H560 V444 H470"/>
+  <rect class="c1f" x="545" y="423" width="12" height="18"/>
+  <rect class="c0f" x="530" y="423" width="12" height="18"/>
+  <rect class="c0f" x="515" y="423" width="12" height="18"/>
+  <line class="ln" x1="562" y1="432" x2="643" y2="432" marker-end="url(#head-ln)"/>
+  <circle class="srv" cx="660" cy="432" r="15"/>
+  <circle class="c1f" cx="660" cy="432" r="6"/>
+  <g transform="translate(452,450)"><rect class="die" width="12" height="12" rx="2.5"/><circle class="pip" cx="3.5" cy="3.5" r="1.3"/><circle class="pip" cx="6" cy="6" r="1.3"/><circle class="pip" cx="8.5" cy="8.5" r="1.3"/></g>
+  <text class="mono s" x="470" y="460">block 4</text>
+  <text class="mono s mut" x="540" y="460">fifo → sequence_store</text>
 
-  <path class="acc" d="M452,278 V242 Q452,232 462,232 H690 Q700,232 700,242 V245" marker-end="url(#head-acc)"/>
-  <text class="s mut" x="576" y="226" text-anchor="middle">server free</text>
-  <line class="acc" x1="460" y1="282" x2="491" y2="266" marker-end="url(#head-acc)"/>
-  <line class="acc" x1="460" y1="290" x2="491" y2="306" marker-end="url(#head-acc)"/>
-  <g class="badge"><circle class="accf" cx="452" cy="286" r="8"/><text x="452" y="289.5" text-anchor="middle">4</text></g>
+  <!-- des::sink: absorbs on arrival -->
+  <text class="mono b" x="836" y="198">des::sink</text>
+  <text class="s mut" x="836" y="214">node 3</text>
+  <text x="836" y="300">absorbs each job</text>
+  <text x="836" y="316">on arrival:</text>
+  <text class="s mut" x="836" y="336">no departure event,</text>
+  <text class="s mut" x="836" y="351">never in the heap</text>
 
-  <path class="q" d="M494,252 H604 V276 H494"/>
-  <rect class="job" x="588" y="255" width="13" height="18"/>
-  <rect class="job" x="572" y="255" width="13" height="18"/>
-  <rect class="job" x="556" y="255" width="13" height="18"/>
-  <path class="q" d="M494,296 H604 V320 H494"/>
-  <rect class="job" x="588" y="299" width="13" height="18"/>
-  <rect class="job" x="572" y="299" width="13" height="18"/>
-  <text x="549" y="344" text-anchor="middle">waiting queues</text>
+  <!-- routes -->
+  <line class="ln" x1="348" y1="248" x2="638" y2="248" marker-end="url(#head-ln)"/>
+  <path class="ln" d="M675,432 H690 Q700,432 700,422 V288" marker-end="url(#head-ln)"/>
+  <text class="s mut" x="708" y="325">back to the CPU</text>
+  <line class="ln" x1="680" y1="248" x2="842" y2="248"/>
+  <line class="term" x1="844" y1="237" x2="844" y2="259"/>
+  <text class="s mut" x="762" y="240" text-anchor="middle">1 − p[c]</text>
 
-  <line class="acc" x1="606" y1="264" x2="681" y2="264" marker-end="url(#head-acc)"/>
-  <line class="acc" x1="606" y1="308" x2="681" y2="308" marker-end="url(#head-acc)"/>
-  <text class="s mut" x="643" y="290" text-anchor="middle">service pick</text>
+  <!-- steps 2-4: a CPU burst ends, route() sends the job to the tail of the disk queue -->
+  <path class="acc" d="M660,268 V306 Q660,316 650,316 H430 Q420,316 420,326 V422 Q420,432 430,432 H467" marker-end="url(#head-acc)"/>
+  <g class="badge"><circle class="accf" cx="660" cy="290" r="8"/><text x="660" y="293.5" text-anchor="middle">2</text></g>
+  <g class="badge"><circle class="accf" cx="480" cy="316" r="8"/><text x="480" y="319.5" text-anchor="middle">3</text></g>
+  <g class="badge"><circle class="accf" cx="420" cy="384" r="8"/><text x="420" y="387.5" text-anchor="middle">4</text></g>
+  <text class="mono s" x="494" y="308">route()</text>
+  <g transform="translate(546,298)"><rect class="die" width="12" height="12" rx="2.5"/><circle class="pip" cx="3.5" cy="3.5" r="1.3"/><circle class="pip" cx="6" cy="6" r="1.3"/><circle class="pip" cx="8.5" cy="8.5" r="1.3"/></g>
+  <text class="mono s" x="564" y="308">block 3</text>
+  <text class="s mut" x="494" y="334">probability p[c]</text>
 
-  <circle class="srv" cx="700" cy="264" r="17"/>
-  <circle class="job" cx="700" cy="264" r="6"/>
-  <circle class="srv" cx="700" cy="308" r="17"/>
-  <circle class="job" cx="700" cy="308" r="6"/>
-  <text x="700" y="344" text-anchor="middle">servers</text>
-  <text class="s mut" x="700" y="360" text-anchor="middle">(server queues)</text>
+  <!-- Inside a station -->
+  <line class="lead" x1="520" y1="470" x2="520" y2="530"/>
+  <rect class="frame" x="20" y="530" width="580" height="180" rx="10"/>
+  <text class="h" x="36" y="554">Inside a station</text>
+  <text class="mono s mut" x="150" y="554">des::station&lt;TT, T&gt;</text>
 
-  <rect class="box dash" x="620" y="372" width="156" height="40" rx="4"/>
-  <text class="s" x="632" y="388">service times</text>
-  <text class="mono s" x="632" y="404">T&lt;TT&gt;[server][class]</text>
+  <line class="acc" x1="36" y1="626" x2="52" y2="626"/>
+  <line class="acc" x1="68" y1="622" x2="97" y2="608" marker-end="url(#head-acc)"/>
+  <line class="acc" x1="68" y1="630" x2="97" y2="644" marker-end="url(#head-acc)"/>
+  <g class="badge"><circle class="accf" cx="60" cy="626" r="8"/><text x="60" y="629.5" text-anchor="middle">4</text></g>
 
-  <path class="acc" d="M717,264 H738 Q750,264 750,276 V286"/>
-  <path class="acc" d="M717,308 H738 Q750,308 750,296 V286"/>
-  <line class="acc" x1="750" y1="286" x2="890" y2="286" marker-end="url(#head-acc)"/>
-  <text class="mono s" x="820" y="278" text-anchor="middle">route()</text>
+  <path class="q" d="M100,592 H200 V616 H100"/>
+  <rect class="c0f" x="184" y="595" width="13" height="18"/>
+  <rect class="c1f" x="168" y="595" width="13" height="18"/>
+  <rect class="c0f" x="152" y="595" width="13" height="18"/>
+  <path class="q" d="M100,636 H200 V660 H100"/>
+  <rect class="c1f" x="184" y="639" width="13" height="18"/>
+  <rect class="c1f" x="168" y="639" width="13" height="18"/>
+  <text x="150" y="680" text-anchor="middle">waiting queues</text>
 
-  <!-- des::sink -->
-  <text class="mono b" x="864" y="200">des::sink</text>
-  <text x="864" y="220">absorbs jobs</text>
-  <circle class="srv" cx="908" cy="286" r="17"/>
-  <circle class="job" cx="908" cy="286" r="6"/>
-  <text class="s mut" x="908" y="322" text-anchor="middle">service time 0</text>
+  <line class="acc" x1="202" y1="604" x2="281" y2="604" marker-end="url(#head-acc)"/>
+  <line class="acc" x1="202" y1="648" x2="281" y2="648" marker-end="url(#head-acc)"/>
+  <text class="s mut" x="242" y="630" text-anchor="middle">service pick</text>
 
-  <!-- Inside every queue -->
-  <line class="lead" x1="549" y1="350" x2="549" y2="470"/>
-  <rect class="frame" x="250" y="470" width="370" height="170" rx="10"/>
-  <text class="h" x="266" y="494">Inside every queue</text>
+  <circle class="srv" cx="300" cy="604" r="17"/>
+  <circle class="c0f" cx="300" cy="604" r="6"/>
+  <circle class="srv" cx="300" cy="648" r="17"/>
+  <circle class="c1f" cx="300" cy="648" r="6"/>
+  <text x="300" y="684" text-anchor="middle">servers</text>
+  <text class="s mut" x="300" y="699" text-anchor="middle">(server queues)</text>
 
-  <rect class="box dash" x="380" y="502" width="110" height="46" rx="6"/>
-  <text class="mono b" x="435" y="522" text-anchor="middle">des::policy</text>
-  <text class="s mut" x="435" y="539" text-anchor="middle">shared by queues</text>
-  <text x="502" y="518">fifo · is · ps</text>
-  <text class="s mut" x="502" y="534">or your own</text>
+  <path class="acc" d="M317,604 H338 Q350,604 350,616 V626"/>
+  <path class="acc" d="M317,648 H338 Q350,648 350,636 V626"/>
+  <line class="acc" x1="350" y1="626" x2="404" y2="626" marker-end="url(#head-acc)"/>
+  <text class="mono s" x="381" y="617" text-anchor="middle">route()</text>
 
-  <rect class="box" x="266" y="576" width="110" height="46" rx="6"/>
-  <text class="mono b" x="321" y="596" text-anchor="middle">des::queue</text>
-  <text class="s mut" x="321" y="613" text-anchor="middle">capacity</text>
-
-  <rect class="box dash" x="494" y="576" width="110" height="46" rx="6"/>
-  <text class="mono b" x="549" y="596" text-anchor="middle">job_store</text>
-  <text class="s mut" x="549" y="613" text-anchor="middle">container, order</text>
-
-  <line class="ln" x1="336" y1="574" x2="385" y2="551" marker-end="url(#head-ln)"/>
-  <text class="mono s" x="352" y="556" text-anchor="end">admit()</text>
-  <line class="ln" x1="484" y1="550" x2="533" y2="573" marker-end="url(#head-ln)"/>
-  <text class="mono s" x="518" y="557">make_store()</text>
-  <line class="ln" x1="376" y1="599" x2="492" y2="599" marker-end="url(#head-ln)"/>
-  <text class="s mut" x="434" y="592" text-anchor="middle">owns</text>
+  <rect class="box dash" x="416" y="584" width="168" height="40" rx="4"/>
+  <text class="s" x="428" y="600">service times</text>
+  <text class="mono s" x="428" y="616">T&lt;TT&gt;[server][class]</text>
+  <g transform="translate(416,634)"><rect class="die" width="12" height="12" rx="2.5"/><circle class="pip" cx="3.5" cy="3.5" r="1.3"/><circle class="pip" cx="6" cy="6" r="1.3"/><circle class="pip" cx="8.5" cy="8.5" r="1.3"/></g>
+  <text class="mono s" x="434" y="644">stream 0</text>
+  <text class="s mut" x="434" y="659">queue and server choices</text>
+  <g transform="translate(416,670)"><rect class="die" width="12" height="12" rx="2.5"/><circle class="pip" cx="3.5" cy="3.5" r="1.3"/><circle class="pip" cx="6" cy="6" r="1.3"/><circle class="pip" cx="8.5" cy="8.5" r="1.3"/></g>
+  <text class="mono s" x="434" y="680">stream 1 + c</text>
+  <text class="s mut" x="434" y="695">service times of class c</text>
 
   <!-- Measurement -->
-  <line class="ln" x1="752" y1="420" x2="752" y2="500" marker-end="url(#head-ln)"/>
-  <text class="s mut" x="762" y="459">signals: arrival, service, departure</text>
-  <rect class="frame" x="640" y="470" width="340" height="170" rx="10"/>
-  <text class="h" x="656" y="494">Measurement</text>
+  <line class="ln" x1="800" y1="494" x2="800" y2="528" marker-end="url(#head-ln)"/>
+  <text class="s mut" x="790" y="515" text-anchor="end">signals: arrival, service, departure</text>
+  <rect class="frame" x="620" y="530" width="360" height="180" rx="10"/>
+  <text class="h" x="636" y="554">Measurement</text>
 
-  <rect class="box" x="656" y="502" width="130" height="46" rx="6"/>
-  <text class="mono b" x="721" y="522" text-anchor="middle">des::message</text>
-  <text class="s mut" x="721" y="539" text-anchor="middle">event fields by tag</text>
-  <text class="s mut" x="656" y="574">values per class;</text>
-  <text class="s mut" x="656" y="590">reset() keeps one per run</text>
-  <text class="s mut" x="656" y="606">→ confidence intervals</text>
+  <rect class="box" x="636" y="562" width="130" height="46" rx="6"/>
+  <text class="mono b" x="701" y="582" text-anchor="middle">des::message</text>
+  <text class="s mut" x="701" y="599" text-anchor="middle">event fields by tag</text>
+  <text class="s mut" x="636" y="634">values per class;</text>
+  <text class="s mut" x="636" y="650">reset() keeps one per run</text>
+  <text class="s mut" x="636" y="666">→ confidence intervals</text>
 
-  <line class="ln" x1="786" y1="525" x2="834" y2="525" marker-end="url(#head-ln)"/>
-  <text class="s mut" x="810" y="518" text-anchor="middle">update</text>
+  <line class="ln" x1="766" y1="585" x2="814" y2="585" marker-end="url(#head-ln)"/>
+  <text class="s mut" x="790" y="578" text-anchor="middle">update</text>
 
-  <rect class="box dash" x="836" y="502" width="128" height="124" rx="6"/>
-  <text class="h" x="850" y="522">observers</text>
-  <text class="mono" x="850" y="542">scalar</text>
-  <text class="mono" x="850" y="558">counter</text>
-  <text class="mono" x="850" y="574">sample</text>
-  <text class="mono" x="850" y="590">histogram</text>
-  <text class="s mut" x="850" y="612">or your own</text>
+  <rect class="box dash" x="816" y="562" width="148" height="124" rx="6"/>
+  <text class="h" x="830" y="582">observers</text>
+  <text class="mono" x="830" y="602">scalar</text>
+  <text class="mono" x="830" y="618">counter</text>
+  <text class="mono" x="830" y="634">sample</text>
+  <text class="mono" x="830" y="650">histogram</text>
+  <text class="s mut" x="830" y="672">or your own</text>
+
+  <!-- Inside every queue -->
+  <line class="lead" x1="150" y1="686" x2="150" y2="730"/>
+  <rect class="frame" x="20" y="730" width="460" height="170" rx="10"/>
+  <text class="h" x="36" y="754">Inside every queue</text>
+
+  <rect class="box" x="36" y="766" width="104" height="44" rx="6"/>
+  <text class="mono b" x="88" y="785" text-anchor="middle">des::queue</text>
+  <text class="s mut" x="88" y="801" text-anchor="middle">capacity</text>
+
+  <rect class="box dash" x="200" y="766" width="110" height="44" rx="6"/>
+  <text class="mono b" x="255" y="785" text-anchor="middle">des::policy</text>
+  <text class="s mut" x="255" y="801" text-anchor="middle">shared by queues</text>
+
+  <line class="ln" x1="140" y1="788" x2="198" y2="788" marker-end="url(#head-ln)"/>
+  <text class="mono s" x="169" y="781" text-anchor="middle">admit()</text>
+
+  <rect class="box dash" x="200" y="846" width="110" height="44" rx="6"/>
+  <text class="mono b" x="255" y="865" text-anchor="middle">job_store</text>
+  <text class="s mut" x="255" y="881" text-anchor="middle">container, order</text>
+
+  <line class="ln" x1="255" y1="810" x2="255" y2="844" marker-end="url(#head-ln)"/>
+  <text class="mono s" x="247" y="831" text-anchor="end">make_store()</text>
+
+  <path class="ln" d="M88,810 V858 Q88,868 98,868 H198" marker-end="url(#head-ln)"/>
+  <text class="s mut" x="143" y="862" text-anchor="middle">owns</text>
+
+  <text class="s mut" x="330" y="782">built in</text>
+  <text class="mono s" x="330" y="800">fifo</text>
+  <text class="mono s" x="364" y="800">sequence_store</text>
+  <text class="s mut" x="364" y="813">ring buffer</text>
+  <text class="mono s" x="330" y="832">is</text>
+  <text class="mono s" x="364" y="832">time_store</text>
+  <text class="s mut" x="364" y="845">binary heap</text>
+  <text class="mono s" x="330" y="864">ps</text>
+  <text class="mono s" x="364" y="864">ps_store</text>
+  <text class="s mut" x="364" y="877">heap in virtual time</text>
+
+  <!-- Random streams -->
+  <rect class="frame" x="500" y="730" width="480" height="170" rx="10"/>
+  <text class="h" x="516" y="754">Random streams</text>
+  <text class="mono s mut" x="964" y="754" text-anchor="end">des::random_engine · xoshiro256**</text>
+  <text class="s mut" x="516" y="774">One seed; long_jump() cuts blocks of 2¹⁹² draws, jump() streams of 2¹²⁸.</text>
+
+  <text class="mono s mut" x="541.5" y="791" text-anchor="middle">0</text>
+  <text class="mono s mut" x="592.5" y="791" text-anchor="middle">1</text>
+  <text class="mono s mut" x="643.5" y="791" text-anchor="middle">2</text>
+  <text class="mono s mut" x="694.5" y="791" text-anchor="middle">3</text>
+  <text class="mono s mut" x="745.5" y="791" text-anchor="middle">4</text>
+  <text class="mono s mut" x="796.5" y="791" text-anchor="middle">5</text>
+  <text class="mono s mut" x="847.5" y="791" text-anchor="middle">6</text>
+  <text class="mono s mut" x="898.5" y="791" text-anchor="middle">7</text>
+  <rect class="box" x="516" y="796" width="51" height="22"/>
+  <rect class="blk2" x="567" y="796" width="51" height="22"/>
+  <rect class="box" x="618" y="796" width="51" height="22"/>
+  <rect class="blk2" x="669" y="796" width="51" height="22"/>
+  <rect class="box" x="720" y="796" width="51" height="22"/>
+  <rect class="blk2" x="771" y="796" width="51" height="22"/>
+  <rect class="box" x="822" y="796" width="51" height="22"/>
+  <rect class="blk2" x="873" y="796" width="51" height="22"/>
+  <rect class="box" x="924" y="796" width="40" height="22"/>
+  <text class="s" x="541.5" y="811" text-anchor="middle">source</text>
+  <text class="s mut" x="592.5" y="811" text-anchor="middle">routing</text>
+  <text class="s" x="643.5" y="811" text-anchor="middle">CPU</text>
+  <text class="s mut" x="694.5" y="811" text-anchor="middle">routing</text>
+  <text class="s" x="745.5" y="811" text-anchor="middle">Disk</text>
+  <text class="s mut" x="796.5" y="811" text-anchor="middle">routing</text>
+  <text class="s" x="847.5" y="811" text-anchor="middle">sink</text>
+  <text class="s mut" x="898.5" y="811" text-anchor="middle">routing</text>
+  <text class="s mut" x="944" y="811" text-anchor="middle">…</text>
+
+  <!-- zoom: block 2 (CPU) and block 3 (routing out of the CPU) -->
+  <line class="lead" x1="618" y1="818" x2="516" y2="850"/>
+  <line class="lead" x1="669" y1="818" x2="752" y2="850"/>
+  <line class="lead" x1="669" y1="818" x2="768" y2="850"/>
+  <line class="lead" x1="720" y1="818" x2="964" y2="850"/>
+  <rect class="box" x="516" y="850" width="62" height="22"/>
+  <rect class="box" x="578" y="850" width="82" height="22"/>
+  <rect class="box" x="660" y="850" width="82" height="22"/>
+  <rect class="box" x="742" y="850" width="10" height="22"/>
+  <text class="s" x="547" y="865" text-anchor="middle">choices</text>
+  <text class="s" x="619" y="865" text-anchor="middle">class 0 times</text>
+  <text class="s" x="701" y="865" text-anchor="middle">class 1 times</text>
+  <rect class="blk2" x="768" y="850" width="74" height="22"/>
+  <rect class="blk2" x="842" y="850" width="74" height="22"/>
+  <rect class="blk2" x="916" y="850" width="48" height="22"/>
+  <text class="s" x="805" y="865" text-anchor="middle">class 0</text>
+  <text class="s" x="879" y="865" text-anchor="middle">class 1</text>
+  <text class="s mut" x="940" y="865" text-anchor="middle">…</text>
+  <text class="s mut" x="516" y="889">node i: block 2i (here the CPU)</text>
+  <text class="s mut" x="768" y="889">routing out of node i: 2i + 1</text>
 </svg>
