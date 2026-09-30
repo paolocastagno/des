@@ -9,32 +9,118 @@
 #include <libdes_source.hpp>
 #include <libdes_sink.hpp>
 #include <libdes_network.hpp>
+#include <libdes_ratio.hpp>
 #include <libdes_scalar.hpp>
 
 using namespace std;
 
+// ── Stopping rules ─────────────────────────────────────────────────────────
+#ifndef DES_TEST_TOLERANCE
+#define DES_TEST_TOLERANCE 0.01
+#endif
+
+#ifndef DES_TEST_RUN_TOLERANCE
+#define DES_TEST_RUN_TOLERANCE 0.05
+#endif
+
+#ifndef DES_TEST_MIN_RUNS
+#define DES_TEST_MIN_RUNS 10
+#endif
+
+#ifndef DES_TEST_MIN_CYCLES
+#define DES_TEST_MIN_CYCLES 30
+#endif
+
+const double alpha         = 0.05;                     // 95% confidence intervals
+const double tolerance     = DES_TEST_TOLERANCE;       // across runs: stop when the throughput CI is within this fraction of its mean
+const double run_tolerance = DES_TEST_RUN_TOLERANCE;   // within a run: end it when its own throughput CI is within this fraction
+const size_t min_runs      = DES_TEST_MIN_RUNS;        // runs before the first check across runs
+const long   min_cycles    = DES_TEST_MIN_CYCLES;      // cycles before the first check within a run
+
+// An interval is narrow enough when its half-width is within tol times its midpoint
+bool narrow(pair<double, double> ci, double tol)
+{
+    return ci.second - ci.first <= tol * (ci.first + ci.second);
+}
+
+struct replications
+{
+    long   cycles   = 0;     // regeneration cycles over all runs
+    long   jobs     = 0;     // jobs served by the station over all runs
+    double sim_time = 0.0;   // simulated time over all runs
+};
+
+// Runs replications of a source (node 0) -> station (node 1) -> sink (node 2)
+// network with two stopping rules. A regeneration point is a departure that
+// leaves the station empty: arrivals are Poisson, so the time to the next one is
+// memoryless and the model is back in its state at time 0.
+//  - Within a run, each regeneration cycle gives `throughput` one pair: the jobs
+//    the station served in the cycle and the cycle's length. The cycles are
+//    independent, so the ratio observer gives the run's own throughput CI; the run
+//    ends at the first regeneration point at which that CI is within
+//    `run_tolerance` of the estimate.
+//  - Every run starts and ends at a regeneration point, so the runs are
+//    independent and identically distributed, with no warm-up needed. Runs are
+//    added until the throughput CI across runs is within `tolerance` of its mean.
+replications replicate(des::network& net, des::node& sta, des::ratio& throughput)
+{
+    replications r;
+    do {
+        double sim_time = 0.0, start = 0.0;   // now, and the start of the current cycle
+        long jobs = 0;                        // jobs served in the current cycle
+        bool done = false;
+        while (!done)
+        {
+            auto e = net.next_event();        // find the globally earliest event
+            sim_time = e->get_time();
+            bool from_station = e->get_info(EVENT_NODE).second == 1;   // read it before route() moves e
+            net.route(e);                     // route it → fires observer notifications
+            if (from_station)
+            {
+                ++jobs;
+                if (sta.queue_length() + sta.service_length() == 0)   // regeneration point: close the cycle
+                {
+                    throughput.update(jobs, sim_time - start, 0);
+                    ++r.cycles;
+                    r.jobs += jobs;
+                    jobs = 0;
+                    start = sim_time;
+                    done = throughput.n_updates(0) >= min_cycles
+                        && narrow(throughput.run_confidence_interval(alpha, 0), run_tolerance);
+                }
+            }
+        }
+
+        // net.reset propagates reset(true) to all node-attached observers,
+        // storing each run's result for cross-run confidence intervals.
+        net.reset(sim_time, {}, true);   // close the run at the regeneration point
+        throughput.reset(true);          // store the run's throughput
+        r.sim_time += sim_time;
+    }
+    while (throughput.completed_runs(0) < min_runs
+           || !narrow(throughput.confidence_interval(alpha, 0), tolerance));
+    return r;
+}
+
 int main()
 {
-    // ── Random number generator ────────────────────────────────────────────
-    auto gen = make_shared<mt19937_64>();
-    gen->seed(42);
-
     // ── M/M/1 parameters ──────────────────────────────────────────────────
     const double lambda = 0.8;   // arrival rate
     const double mu     = 1.0;   // service rate  →  rho = 0.8
 
     // ── Nodes ──────────────────────────────────────────────────────────────
-    auto src = make_shared<des::source>(vector<double>{lambda}, "Source", gen);
+    auto arr = make_shared<exponential_distribution<double>>(lambda);
+    auto src = make_shared<des::source<double, exponential_distribution>>(
+        vector<shared_ptr<exponential_distribution<double>>>{arr}, "Source");
 
     auto svc = make_shared<exponential_distribution<double>>(mu);
     auto sta = make_shared<des::station<double, exponential_distribution>>(
         vector<vector<shared_ptr<exponential_distribution<double>>>>{{{svc}}},
         1,        // 1 server
         1,        // 1 job per server
-        1,        // 1 event class
+        1,        // 1 waiting queue
         INT_MAX,  // unlimited waiting queue
-        "M/M/1",
-        gen);
+        "M/M/1");
 
     auto snk = make_shared<des::sink>("Sink");
 
@@ -45,8 +131,13 @@ int main()
     auto sojourn = make_shared<des::scalar>(NODE_SOJOURN, 1);
     sta->attach(SIGNAL_NODE_DEPARTURE, sojourn);
 
+    // The station's throughput is measured over regeneration cycles:
+    // jobs served in a cycle / cycle length (see replicate()).
+    des::ratio throughput("throughput", 1);
+
     // ── Network ────────────────────────────────────────────────────────────
     // Node indices:  source = 0   station = 1   sink = 2
+    // The network gives every node its own random streams, all derived from the seed (42)
     vector<vector<vector<double>>> routing = {
         {{0}, {1}, {0}},   // source  → station (p = 1)
         {{0}, {0}, {1}},   // station → sink    (p = 1)
@@ -54,7 +145,7 @@ int main()
     };
 
     vector<shared_ptr<des::node>> nodes{src, sta, snk};
-    des::network net(nodes, routing, gen);
+    des::network net(nodes, routing, 42);
 
     // ── Bootstrap ─────────────────────────────────────────────────────────
     // Inject the first event directly into the source so it schedules
@@ -66,51 +157,21 @@ int main()
     nodes.at(0)->arrival(e);
     nodes.clear();
 
-    // ── Simulation loop ────────────────────────────────────────────────────
+    // ── Simulation ─────────────────────────────────────────────────────────
     cout << "M/M/1 open queueing system\n"
          << "  lambda = " << lambda
          << "  mu = "     << mu
          << "  rho = "    << lambda / mu << "\n"
          << "  Theoretical mean sojourn = " << 1.0 / (mu - lambda) << "\n\n";
 
-#ifndef DES_TEST_EVENTS
-#define DES_TEST_EVENTS 100000
-#endif
-
-#ifndef DES_TEST_RUNS
-#define DES_TEST_RUNS 5
-#endif
-
-    const int n_events = DES_TEST_EVENTS;
-    const int n_runs   = DES_TEST_RUNS;
-    int run = 0;
-
-    do {
-        double sim_time = 0.0;
-        for (int i = 0; i < n_events; ++i)
-        {
-            e = net.next_event();
-            sim_time = e->get_time();
-            net.route(e);
-        }
-
-        double mean_soj = sojourn->mean(0);
-
-        cout << "Run " << run
-             << "  sim_time = " << sim_time
-             << "  mean sojourn = " << mean_soj << "\n";
-
-        // net.reset propagates reset(true) to all node-attached observers,
-        // storing each run's result for cross-run confidence intervals.
-        net.reset(sim_time, {}, true);
-    }
-    while (++run < n_runs);
+    replications r = replicate(net, *sta, throughput);
 
     // ── Cross-run confidence intervals (alpha = 0.05) ──────────────────────
-    auto [thr_lo, thr_hi] = net.get_flow_ci(1, 2, 0, 0.05);
-    auto [soj_lo, soj_hi] = sojourn->confidence_interval(0.05, 0);
+    auto [thr_lo, thr_hi] = throughput.confidence_interval(alpha, 0);
+    auto [soj_lo, soj_hi] = sojourn->confidence_interval(alpha, 0);
 
-    cout << "\nResults over " << n_runs << " replications (95% CI):\n"
+    cout << "Results over " << throughput.completed_runs(0) << " replications (95% CI):\n"
+         << "  " << r.jobs << " jobs served in " << r.cycles << " regeneration cycles, simulated time " << r.sim_time << "\n"
          << "  Throughput   [" << thr_lo << ", " << thr_hi << "]"
          << "  (theory: " << lambda << ")\n"
          << "  Mean sojourn [" << soj_lo << ", " << soj_hi << "]"
@@ -140,10 +201,9 @@ int main()
     const double W2_theory      = erlang_c2 / (c2 * mu2 - lambda2) + 1.0 / mu2;
 
     // ── Nodes ──────────────────────────────────────────────────────────────
-    auto gen2  = make_shared<mt19937_64>();
-    gen2->seed(137);
-
-    auto src2 = make_shared<des::source>(vector<double>{lambda2}, "Source2", gen2);
+    auto arr2 = make_shared<exponential_distribution<double>>(lambda2);
+    auto src2 = make_shared<des::source<double, exponential_distribution>>(
+        vector<shared_ptr<exponential_distribution<double>>>{arr2}, "Source2");
 
     auto svc2 = make_shared<exponential_distribution<double>>(mu2);
     auto sta2 = make_shared<des::station<double, exponential_distribution>>(
@@ -155,14 +215,14 @@ int main()
         1,        // 1 job per server
         1,        // 1 waiting queue
         INT_MAX,  // unlimited capacity
-        "M/M/2",
-        gen2);
+        "M/M/2");
 
     auto snk2 = make_shared<des::sink>("Sink2");
 
     // ── Observer ───────────────────────────────────────────────────────────
     auto sojourn2 = make_shared<des::scalar>(NODE_SOJOURN, 1);
     sta2->attach(SIGNAL_NODE_DEPARTURE, sojourn2);
+    des::ratio throughput2("throughput", 1);
 
     // ── Network ────────────────────────────────────────────────────────────
     vector<vector<vector<double>>> routing2 = {
@@ -172,7 +232,7 @@ int main()
     };
 
     vector<shared_ptr<des::node>> nodes2{src2, sta2, snk2};
-    des::network net2(nodes2, routing2, gen2);
+    des::network net2(nodes2, routing2, 137);
 
     // ── Bootstrap ─────────────────────────────────────────────────────────
     auto e2 = make_shared<des::event>();
@@ -182,7 +242,8 @@ int main()
     nodes2.at(0)->arrival(e2);
     nodes2.clear();
 
-    // ── Simulation loop ────────────────────────────────────────────────────
+    // ── Simulation ─────────────────────────────────────────────────────────
+    // A departure that leaves both servers idle is a regeneration point too.
     cout << "\n\nM/M/2/∞ open queueing system\n"
          << "  lambda = " << lambda2
          << "  mu = "     << mu2
@@ -191,31 +252,14 @@ int main()
          << "  Erlang-C  C(2,a) = " << erlang_c2 << "\n"
          << "  Theoretical mean sojourn = " << W2_theory << "\n\n";
 
-    int run2 = 0;
-    do {
-        double sim_time2 = 0.0;
-        for (int i = 0; i < n_events; ++i)
-        {
-            e2 = net2.next_event();
-            sim_time2 = e2->get_time();
-            net2.route(e2);
-        }
-
-        double mean_soj2 = sojourn2->mean(0);
-
-        cout << "Run " << run2
-             << "  sim_time = " << sim_time2
-             << "  mean sojourn = " << mean_soj2 << "\n";
-
-        net2.reset(sim_time2, {}, true);
-    }
-    while (++run2 < n_runs);
+    replications r2 = replicate(net2, *sta2, throughput2);
 
     // ── Cross-run confidence intervals (alpha = 0.05) ──────────────────────
-    auto [thr2_lo, thr2_hi] = net2.get_flow_ci(1, 2, 0, 0.05);
-    auto [soj2_lo, soj2_hi] = sojourn2->confidence_interval(0.05, 0);
+    auto [thr2_lo, thr2_hi] = throughput2.confidence_interval(alpha, 0);
+    auto [soj2_lo, soj2_hi] = sojourn2->confidence_interval(alpha, 0);
 
-    cout << "\nResults over " << n_runs << " replications (95% CI):\n"
+    cout << "Results over " << throughput2.completed_runs(0) << " replications (95% CI):\n"
+         << "  " << r2.jobs << " jobs served in " << r2.cycles << " regeneration cycles, simulated time " << r2.sim_time << "\n"
          << "  Throughput   [" << thr2_lo << ", " << thr2_hi << "]"
          << "  (theory: " << lambda2 << ")\n"
          << "  Mean sojourn [" << soj2_lo << ", " << soj2_hi << "]"
